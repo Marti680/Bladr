@@ -63,7 +63,9 @@ MANIFEST = {
         {"src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
     ],
     "file_handlers": [
-        {"action": "./", "accept": {"application/pdf": [".pdf"]}}
+        {"action": "./", "accept": {"application/pdf": [".pdf"]},
+         "icons": [{"src": "icons/file-pdf-256.png", "sizes": "256x256", "type": "image/png"},
+                   {"src": "icons/file-pdf-48.png", "sizes": "48x48", "type": "image/png"}]}
     ],
     "launch_handler": {"client_mode": "focus-existing"}
 }

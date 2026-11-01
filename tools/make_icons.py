@@ -28,6 +28,12 @@ async def main():
             await pg.set_content(page(size, mask))
             await pg.screenshot(path=os.path.join(OUT, name), omit_background=True)
             await pg.close()
+        fsvg = open(os.path.join(ROOT, 'src', 'file-icon.svg'), encoding='utf-8').read()
+        for size in (256, 48):
+            pg = await b.new_page(viewport={'width': size, 'height': size})
+            await pg.set_content('<html><body style="margin:0;background:transparent">' + fsvg.replace('<svg ', f'<svg width="{size}" height="{size}" ', 1) + '</body></html>')
+            await pg.screenshot(path=os.path.join(OUT, f'file-pdf-{size}.png'), omit_background=True)
+            await pg.close()
         await b.close()
     print('Ikoner gemt i', OUT)
 
