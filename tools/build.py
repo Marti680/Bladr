@@ -25,7 +25,8 @@ PWA_HEAD = '''<!doctype html>
 <meta name="description" content="Bladr er en PDF-læser med markering, mål, lag, optælling og underskrift. Filerne bliver på din egen computer.">
 <meta name="theme-color" content="#1f5f8b">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <style>
 :root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
