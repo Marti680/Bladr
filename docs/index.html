@@ -1,0 +1,2402 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Bladr er en PDF-læser med markering, mål, lag, optælling og underskrift. Filerne bliver på din egen computer.">
+<meta name="theme-color" content="#1f5f8b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<style>
+:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;font:14px system-ui,-apple-system,"Segoe UI",sans-serif}
+img{max-width:100%}
+[hidden]{display:none!important}
+.updbar{position:fixed;z-index:70;left:50%;transform:translateX(-50%);top:calc(10px + env(safe-area-inset-top,0px));display:flex;align-items:center;gap:12px;
+  background:#1b232b;color:#fff;padding:8px 10px 8px 14px;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.25);font-size:13px;max-width:calc(100% - 32px)}
+.updbar button{border:0;border-radius:6px;background:#6fb0dc;color:#0d1a24;font:inherit;font-weight:600;padding:6px 12px;cursor:pointer}
+</style>
+<script src="pwa.js"></script>
+</head>
+<body>
+<title>Bladr PDF-læser</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Caveat:wght@500&family=Dancing+Script:wght@500&family=Great+Vibes&display=swap">
+<style>
+/* Layout: to værktøjslinjer øverst (dokument + markering), sidepanel (filer / sider / lag / søg) til venstre, papirbane i midten */
+:root{
+  --bg:#e7ebee; --desk:#d9dfe4; --panel:#f5f7f8; --fg:#1b232b; --muted:#5f6c78; --line:#c9d1d8;
+  --accent:#1f5f8b; --accent-ink:#ffffff; --accent-soft:#d4e4ef; --hit:rgba(232,166,35,.42); --danger:#c92a2a;
+  --paper-shadow:0 1px 2px rgba(20,30,40,.18),0 4px 14px rgba(20,30,40,.10);
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#151a1f; --desk:#0f1317; --panel:#1b2228; --fg:#e3e8ec; --muted:#93a0ab; --line:#2c363f;
+  --accent:#6fb0dc; --accent-ink:#0d1a24; --accent-soft:#1f3443; --hit:rgba(240,180,60,.45); --danger:#ff8787;
+  --paper-shadow:0 1px 2px rgba(0,0,0,.5),0 6px 18px rgba(0,0,0,.35); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#151a1f; --desk:#0f1317; --panel:#1b2228; --fg:#e3e8ec; --muted:#93a0ab; --line:#2c363f;
+  --accent:#6fb0dc; --accent-ink:#0d1a24; --accent-soft:#1f3443; --hit:rgba(240,180,60,.45); --danger:#ff8787;
+  --paper-shadow:0 1px 2px rgba(0,0,0,.5),0 6px 18px rgba(0,0,0,.35); color-scheme:dark}
+html,body{height:100%}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--fg);font:14px/1.45 var(--sans);overflow:hidden}
+.app{--sw:312px;height:100%;display:grid;grid-template-rows:auto auto 1fr;grid-template-columns:var(--sw) minmax(0,1fr);grid-template-areas:"bar bar" "tools tools" "side main"}
+.app.noside{--sw:0px}
+.app.peek .side{position:fixed;z-index:25;top:var(--toph,96px);bottom:0;left:0;width:312px;border-right:1px solid var(--line);box-shadow:8px 0 30px rgba(0,0,0,.16);padding-left:env(safe-area-inset-left,0px)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.bar,.tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--panel);border-bottom:1px solid var(--line);
+  padding-block:7px;padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}
+.bar{grid-area:bar}
+.tools{grid-area:tools;gap:6px;padding-block:5px}
+.group{display:flex;align-items:center;gap:2px}
+.tools .group[role="toolbar"]{flex-wrap:wrap;min-width:0}
+.sep{width:1px;height:22px;background:var(--line);margin:0 3px}
+.ib{height:32px;min-width:32px;padding:0 8px;border:1px solid transparent;border-radius:6px;background:transparent;display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+.ib:hover{background:var(--accent-soft)}
+.ib[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--line)}
+.tool[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.ib:disabled{opacity:.4;cursor:default;background:transparent}
+.ib svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ib .lbl{font-size:13px}
+.primary{background:var(--accent);color:var(--accent-ink);border-radius:6px;border:0;height:32px;padding:0 12px;font-weight:500;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.primary:hover{filter:brightness(1.08)}
+.primary svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.docname{font-weight:600;min-width:0;flex:1 1 120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pagebox{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums;color:var(--muted)}
+.pagebox input{width:3.6em;height:28px;text-align:center;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--fg);font-family:var(--mono)}
+.zoomval{font-family:var(--mono);font-size:13px;width:4.2em;text-align:center;font-variant-numeric:tabular-nums}
+.search{display:flex;align-items:center;gap:6px;height:32px;border:1px solid var(--line);border-radius:6px;background:var(--bg);padding:0 8px;flex:0 1 200px;min-width:0}
+.search svg{width:16px;height:16px;stroke:var(--muted);fill:none;stroke-width:2;flex:none}
+.search input{border:0;background:transparent;outline:none;width:100%;min-width:0}
+
+/* egenskabspanel (fast i højre side) */
+#paneTool{padding:0;overflow-x:hidden}
+.seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{flex:1;border:0;background:none;height:30px;font-size:12.5px;padding:0 4px;white-space:nowrap}
+.seg button + button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.linkbtn{border:0;background:none;color:var(--accent);padding:0;text-align:left;font-size:12.5px;align-self:flex-start}
+.linkbtn:hover{text-decoration:underline}
+.done{height:30px;padding:0 8px;font-size:12.5px;display:inline-flex;align-items:center;gap:6px;flex:none}
+kbd{font:11px var(--mono);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 4px;color:var(--muted);background:var(--bg)}
+.psec{padding:12px 14px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:9px}
+.psec h3{margin:0;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.phead{display:flex;align-items:flex-start;gap:8px}
+.phead > div{flex:1;min-width:0}
+.ptitle{font-size:16px;font-weight:600}
+.phint{margin:0;font-size:12.5px;color:var(--muted);line-height:1.45}
+.pnote{margin:0;font-size:12px;color:var(--muted)}
+.pnote.warn{color:var(--danger)}
+.prow{display:grid;grid-template-columns:92px minmax(0,1fr);align-items:center;gap:8px;min-height:30px}
+.plabel{font-size:12.5px;color:var(--muted)}
+.prow .sel,.prow .num{width:100%;max-width:none}
+.prow .pair{display:flex;gap:4px;min-width:0}
+.prow .pair > *{flex:1;min-width:0}
+.check{display:flex;align-items:center;gap:6px;font-size:13px}
+.num,.sel{box-sizing:border-box}
+.num{height:30px;border:1px solid var(--line);border-radius:6px;background:var(--bg);padding:0 8px;font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums;min-width:0}
+.num:disabled{opacity:.5}
+.swatches{display:flex;gap:5px;flex-wrap:wrap}
+.sw{width:22px;height:22px;border-radius:50%;border:2px solid var(--panel);box-shadow:0 0 0 1px var(--line);padding:0}
+.sw[aria-pressed="true"]{box-shadow:0 0 0 2px var(--fg)}
+.sel{height:30px;border:1px solid var(--line);border-radius:6px;background:var(--bg);padding:0 6px;max-width:150px;min-width:0}
+.danger{border:1px solid var(--line);background:none;border-radius:6px;height:32px;color:var(--danger);display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.danger:hover{border-color:var(--danger)}
+.danger svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.psec .primary{justify-content:center}
+.spacer{flex:1}
+.scalebtn{font-family:var(--mono);font-size:13px}
+
+/* sidepanel */
+.side{grid-area:side;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.noside .side{border:0}
+.tabs{display:flex;border-bottom:1px solid var(--line);padding:0 6px}
+.tab{flex:1;border:0;background:none;padding:10px 1px;font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);border-bottom:2px solid transparent}
+.tab[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent)}
+.pane{flex:1;overflow:auto;min-height:0;padding:10px}
+.files{display:flex;flex-direction:column;gap:2px}
+.file{display:grid;grid-template-columns:1fr auto;align-items:center;gap:4px;border-radius:6px}
+.file.cur{background:var(--accent-soft)}
+.file .open{border:0;background:none;text-align:left;padding:7px 8px;min-width:0;border-radius:6px}
+.file .open:hover{background:var(--accent-soft)}
+.fname{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fmeta{display:block;font-size:12px;color:var(--muted);font-family:var(--mono)}
+.x{border:0;background:none;color:var(--muted);width:28px;height:28px;border-radius:5px;flex:none}
+.x:hover{color:var(--fg);background:var(--bg)}
+.hint{color:var(--muted);font-size:13px;padding:6px 4px}
+.status{font-size:12px;color:var(--muted);padding:0 4px 8px}
+.thumbs{display:flex;flex-direction:column;align-items:center;gap:14px;padding:4px 0 10px}
+.thumb{border:0;background:none;padding:0;display:flex;flex-direction:column;align-items:center;gap:4px;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.thumb .t{background:#fff;box-shadow:var(--paper-shadow);outline:2px solid transparent;outline-offset:2px;display:block}
+.thumb .t canvas{display:block;width:100%;height:100%}
+.thumb.cur .t{outline-color:var(--accent)}
+.thumb.cur{color:var(--fg)}
+.results{display:flex;flex-direction:column;gap:4px}
+.res{border:0;background:none;text-align:left;padding:8px;border-radius:6px;display:flex;flex-direction:column;gap:2px}
+.res:hover{background:var(--accent-soft)}
+.res b{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--accent)}
+.res span{font-size:13px;overflow-wrap:anywhere}
+.res mark{background:var(--hit);color:inherit;border-radius:2px}
+/* lag */
+.layers{display:flex;flex-direction:column;gap:2px}
+.layer{display:flex;align-items:center;gap:2px;border-radius:6px;padding:2px}
+.layer.act{background:var(--accent-soft)}
+.layer .lname{flex:1;min-width:0;border:0;background:none;text-align:left;padding:6px 4px;display:flex;flex-direction:column}
+.layer .lname b{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.layer .lname small{font-size:12px;color:var(--muted)}
+.layer.off .lname b{color:var(--muted);text-decoration:line-through}
+.layer input{flex:1;min-width:0;height:30px;border:1px solid var(--accent);border-radius:5px;background:var(--bg);padding:0 6px}
+.eye svg,.x svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.x.confirm{color:var(--danger);width:auto;padding:0 6px;font-size:12px;font-weight:600}
+.addlayer{margin-top:8px;border:1px dashed var(--line);background:none;border-radius:6px;height:34px;width:100%;color:var(--muted)}
+.addlayer:hover{color:var(--fg);border-color:var(--accent)}
+.note{font-size:12px;color:var(--muted);padding:10px 4px 0;line-height:1.5}
+
+/* papirbane */
+.main{grid-area:main;position:relative;min-width:0;min-height:0;background:var(--desk)}
+.viewer{position:absolute;inset:0;overflow:auto;padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;align-items:center;gap:18px}
+.page{position:relative;background:#fff;box-shadow:var(--paper-shadow);flex:none;--scale-factor:1}
+.page canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.page .num{position:absolute;right:0;bottom:-17px;font:11px var(--mono);color:var(--muted)}
+.textLayer{position:absolute;inset:0;overflow:hidden;line-height:1;text-size-adjust:none;forced-color-adjust:none;transform-origin:0 0;z-index:2}
+.textLayer span,.textLayer br{color:transparent;position:absolute;white-space:pre;cursor:text;transform-origin:0% 0%}
+.textLayer span.hit{background:var(--hit);border-radius:2px}
+.textLayer ::selection{background:rgba(31,95,139,.32)}
+.textLayer .endOfContent{display:block;position:absolute;inset:100% 0 0;z-index:-1;cursor:default;user-select:none}
+.ann{position:absolute;inset:0;width:100%;height:100%;z-index:3;pointer-events:none;overflow:visible}
+.ann .hit{pointer-events:all;cursor:move}
+.ann .hd{pointer-events:all;cursor:grab}
+.ann .lab{cursor:grab}
+.draw .ann{pointer-events:all;cursor:crosshair;touch-action:none}
+.draw .ann .hit,.draw .ann .hd{pointer-events:none}
+.draw .textLayer{pointer-events:none}
+.editor{position:absolute;z-index:6;resize:none;overflow:hidden;border:1px dashed var(--accent);background:rgba(255,255,255,.85);color:#111;
+  font-family:Helvetica,Arial,sans-serif;line-height:1.2;white-space:pre;outline:none;margin:0;box-sizing:border-box}
+
+/* dialoger */
+.drop{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:color-mix(in srgb,var(--bg) 80%,transparent);pointer-events:none}
+.drop div{border:2px dashed var(--accent);border-radius:14px;padding:40px 48px;font-size:18px;font-weight:600;background:var(--panel)}
+.modal{position:fixed;inset:0;z-index:40;display:grid;place-items:center;background:color-mix(in srgb,var(--desk) 70%,transparent);
+  padding-block:16px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;max-width:400px;width:100%;display:flex;flex-direction:column;gap:12px;box-shadow:0 10px 40px rgba(0,0,0,.18);max-height:100%;overflow:auto}
+.card h2{margin:0;font-size:17px;text-wrap:balance}
+.card p{margin:0;color:var(--muted)}
+.card .txt{height:34px;border:1px solid var(--line);border-radius:6px;padding:0 10px;background:var(--bg);min-width:0}
+.card .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.card .row.end{justify-content:flex-end}
+.card fieldset{border:1px solid var(--line);border-radius:8px;padding:8px 12px 10px;margin:0;display:flex;flex-direction:column;gap:6px}
+.card legend{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:0 4px}
+.card label.opt{display:flex;gap:8px;align-items:flex-start}
+.card label.opt small{display:block;color:var(--muted);font-size:12px}
+.card .big{font-family:var(--mono);font-size:15px;color:var(--fg)}
+.ghost{border:1px solid var(--line);background:none;border-radius:6px;height:32px;padding:0 12px}
+.ghost:hover{border-color:var(--accent)}
+.or{font-size:12px;color:var(--muted);text-align:center}
+.sigcard{max-width:540px}
+.sigpadwrap{position:relative}
+.sigpad{width:100%;height:170px;display:block;background:#fff;border:1px dashed var(--line);border-radius:8px;touch-action:none;cursor:crosshair;
+  background-image:linear-gradient(#c3ccd4,#c3ccd4);background-size:calc(100% - 48px) 1px;background-position:24px 74%;background-repeat:no-repeat}
+.sigpadhint{position:absolute;inset:0;display:grid;place-items:center;color:#8a96a1;pointer-events:none;font-size:14px}
+.sigsaved{display:flex;gap:8px;flex-wrap:wrap}
+.sigitem{display:flex;align-items:center;border:1px solid var(--line);border-radius:8px;background:#fff}
+.sigitem .x{color:#5f6c78}
+.sigpick{border:0;background:none;padding:6px 10px;height:54px;display:flex;align-items:center;border-radius:8px}
+.sigpick:hover{background:#eef3f7}
+.fontopts{display:flex;flex-direction:column;gap:6px}
+.fontopt{border:1px solid var(--line);background:#fff;border-radius:8px;height:58px;font-size:32px;text-align:left;padding:0 14px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.fontopt[aria-pressed="true"]{outline:2px solid var(--accent);outline-offset:1px}
+.imgprev{background:#fff;border:1px dashed var(--line);border-radius:8px;min-height:96px;display:grid;place-items:center;padding:8px}
+.imgprev img{max-height:110px;max-width:100%}
+.imgprev .hint{color:#5f6c78}
+.sigcol{width:26px;height:26px;border-radius:50%;border:2px solid var(--panel);box-shadow:0 0 0 1px var(--line);padding:0}
+.sigcol[aria-pressed="true"]{box-shadow:0 0 0 2px var(--fg)}
+.cgroups{display:flex;flex-direction:column;gap:2px}
+.cgroup{display:flex;align-items:center;border-radius:6px}
+.cgroup.act{background:var(--accent-soft)}
+.cpick{flex:1;min-width:0;border:0;background:none;display:flex;align-items:center;gap:8px;padding:6px 6px;text-align:left;border-radius:6px}
+.cname{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cnum{font-family:var(--mono);font-size:12.5px;font-variant-numeric:tabular-nums;color:var(--muted)}
+.stamps{display:flex;flex-wrap:wrap;gap:6px}
+.stampbtn{border:2px solid;background:#fff;border-radius:4px;font-weight:700;font-size:11px;letter-spacing:.04em;padding:4px 7px;font-family:Helvetica,Arial,sans-serif}
+.stampbtn[aria-pressed="true"]{outline:2px solid var(--fg);outline-offset:2px}
+.kit{display:flex;flex-direction:column;gap:2px}
+.kititem{display:flex;align-items:center;border-radius:6px}
+.kititem.act{background:var(--accent-soft)}
+.kitpick{flex:1;min-width:0;border:0;background:none;display:flex;align-items:center;gap:8px;padding:6px;text-align:left;border-radius:6px}
+.kitpick i,.litem > i{width:10px;height:10px;border-radius:50%;flex:none}
+.kitpick span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kitform{display:flex;flex-direction:column;gap:6px;border:1px solid var(--line);border-radius:8px;padding:10px}
+.kitpick img{width:22px;height:22px;object-fit:contain;flex:none;background:#fff;border-radius:3px}
+.kitpick small{display:block;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kitdetail{display:flex;flex-direction:column;gap:5px;padding:4px 6px 10px 36px}
+.symprev{min-height:140px;max-height:260px;display:grid;place-items:center;border:1px dashed var(--line);border-radius:8px;padding:10px;
+  background-color:#fff;background-image:linear-gradient(45deg,#e9ecef 25%,transparent 25%,transparent 75%,#e9ecef 75%),linear-gradient(45deg,#e9ecef 25%,transparent 25%,transparent 75%,#e9ecef 75%);background-size:16px 16px;background-position:0 0,8px 8px}
+.symprev img{max-width:100%;max-height:230px}
+.symprev .hint{color:#5f6c78}
+.lfilter{display:flex;gap:6px;margin-bottom:8px}
+.lfilter .sel{flex:1;max-width:none}
+.lsum{font-size:12.5px;color:var(--muted);padding:0 2px 8px;display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.list{display:flex;flex-direction:column;gap:2px;margin-bottom:12px}
+.lpage{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:10px 4px 4px}
+.litem{border:0;background:none;text-align:left;display:flex;align-items:flex-start;gap:8px;padding:7px 6px;border-radius:6px;width:100%}
+.litem > i{margin-top:5px}
+.litem:hover,.litem.cur{background:var(--accent-soft)}
+.lmain{flex:1;min-width:0;font-size:13px;overflow-wrap:anywhere}
+.lnote{display:block;font-size:12.5px;color:var(--fg);margin-top:2px;font-style:italic}
+.lmeta{display:block;font-size:11.5px;color:var(--muted)}
+.pill{font-size:11px;font-weight:600;border-radius:99px;padding:1px 7px;white-space:nowrap;flex:none}
+.s-open{background:#ffe3e3;color:#a61e1e}.s-progress{background:#fff3bf;color:#7a5a00}.s-done{background:#d3f9d8;color:#1f6b2f}.s-rejected{background:#e9ecef;color:#495057}
+.cmpcard{max-width:1180px;height:min(92vh,1000px)}
+.cmpctl{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px 16px;align-items:center}
+.cmpctl .prow{grid-template-columns:110px minmax(0,1fr)}
+.cmplegend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:var(--muted);align-items:center}
+.cmplegend i{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:5px;vertical-align:-2px}
+.cmpview{flex:1;min-height:0;overflow:auto;background:var(--desk);border-radius:8px;cursor:zoom-in}
+.cmpview canvas{display:block;width:100%;height:auto;background:#fff}
+.cmpview.zoom{cursor:zoom-out}.cmpview.zoom canvas{width:auto;max-width:none}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:9px 14px;border-radius:8px;font-size:13px;z-index:60;max-width:calc(100% - 32px)}
+
+@media (max-width:1700px){ .ib .lbl{display:none} }
+@media (max-width:820px){
+  .app,.app.noside,.app.noprops{grid-template-columns:minmax(0,1fr);grid-template-areas:"bar" "tools" "main"}
+  .side{position:fixed;z-index:30;top:0;bottom:0;left:0;width:min(300px,86vw);box-shadow:0 0 40px rgba(0,0,0,.3);padding-top:env(safe-area-inset-top,0px);padding-left:env(safe-area-inset-left,0px)}
+  .noside .side{display:none}
+  .hide-sm{display:none}
+  .search{flex:1 1 100%;order:10}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+
+<div class="app noside" id="app">
+  <header class="bar">
+    <button class="ib" id="btnSide" aria-pressed="false" title="Vis/skjul sidepanel" aria-label="Sidepanel"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg></button>
+    <button class="primary" id="btnOpen"><svg viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>Åbn PDF</button>
+    <input type="file" id="fileIn" accept="application/pdf,.pdf" multiple hidden>
+    <div class="docname" id="docName">Intet dokument</div>
+    <div class="group pagebox">
+      <button class="ib" id="btnPrev" title="Forrige side (←)" aria-label="Forrige side"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+      <input id="pageIn" inputmode="numeric" aria-label="Sidenummer" value="1"><span id="pageCount">/ 0</span>
+      <button class="ib" id="btnNext" title="Næste side (→)" aria-label="Næste side"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+    </div>
+    <span class="sep hide-sm"></span>
+    <div class="group">
+      <button class="ib" id="btnOut" title="Zoom ud (−)" aria-label="Zoom ud"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+      <span class="zoomval" id="zoomVal">100%</span>
+      <button class="ib" id="btnIn" title="Zoom ind (+)" aria-label="Zoom ind"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button class="ib" id="btnFitW" title="Tilpas bredde" aria-label="Tilpas bredde" aria-pressed="true"><svg viewBox="0 0 24 24"><path d="M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4"/></svg></button>
+      <button class="ib" id="btnFitP" title="Hel side" aria-label="Hel side" aria-pressed="false"><svg viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="1"/></svg></button>
+      <button class="ib" id="btnRot" title="Rotér visning 90°" aria-label="Rotér"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg></button>
+    </div>
+    <button class="ib" id="btnCmp" title="Sammenlign revisioner" aria-label="Sammenlign revisioner"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="12" height="15" rx="1"/><rect x="9" y="6" width="12" height="15" rx="1"/></svg></button>
+    <button class="ib" id="btnSet" title="Indstillinger for enheder" aria-label="Indstillinger"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+    <label class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="q" type="search" placeholder="Søg ( / )" aria-label="Søg i dokumentet"></label>
+  </header>
+
+  <div class="tools" id="tools">
+    <div class="group" role="toolbar" aria-label="Værktøjer">
+      <button class="ib tool" data-tool="select" title="Vælg og flyt (V)"><svg viewBox="0 0 24 24"><path d="M5 3l6 17 2.5-7L20 10.5z"/></svg><span class="lbl">Vælg</span></button>
+      <button class="ib tool" data-tool="line" title="Streg (L) – hold Shift for 45°"><svg viewBox="0 0 24 24"><path d="M5 19L19 5"/></svg><span class="lbl">Streg</span></button>
+      <button class="ib tool" data-tool="arrow" title="Pil (A)"><svg viewBox="0 0 24 24"><path d="M5 19L19 5M10 5h9v9"/></svg><span class="lbl">Pil</span></button>
+      <button class="ib tool" data-tool="rect" title="Rektangel / sky (R)"><svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="1"/></svg><span class="lbl">Ramme</span></button>
+      <button class="ib tool" data-tool="circle" title="Cirkel (O) – træk fra centrum"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 12h8"/></svg><span class="lbl">Cirkel</span></button>
+      <button class="ib tool" data-tool="text" title="Tekstfelt (T)"><svg viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></svg><span class="lbl">Tekst</span></button>
+      <button class="ib tool" data-tool="callout" title="Tekst med pil (C) – træk fra punktet til teksten"><svg viewBox="0 0 24 24"><rect x="11" y="3" width="10" height="7" rx="1"/><path d="M11 9L4 19M4 19l1-4M4 19l4-1"/></svg><span class="lbl">Tekst + pil</span></button>
+      <button class="ib tool" data-tool="measure" title="Mål afstand (M)"><svg viewBox="0 0 24 24"><path d="M4 12h16M4 8v8M20 8v8M8 12v-2M12 12V9M16 12v-2"/></svg><span class="lbl">Mål</span></button>
+      <button class="ib tool" data-tool="poly" title="Polylinje med længde (P) – klik punkter, dobbeltklik afslutter"><svg viewBox="0 0 24 24"><path d="M3 18l6-9 5 6 7-10"/><circle cx="3" cy="18" r="1.5"/><circle cx="21" cy="5" r="1.5"/></svg><span class="lbl">Polylinje</span></button>
+      <button class="ib tool" data-tool="area" title="Areal og omkreds (F)"><svg viewBox="0 0 24 24"><path d="M4 7l9-3 7 6-3 10H6z"/><path d="M9 13h6" opacity=".6"/></svg><span class="lbl">Areal</span></button>
+      <button class="ib tool" data-tool="count" title="Tæl (K)"><svg viewBox="0 0 24 24"><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="7" r="2.5"/><circle cx="7" cy="17" r="2.5"/><path d="M14 17h6M17 14v6"/></svg><span class="lbl">Tæl</span></button>
+      <button class="ib tool" data-tool="stamp" title="Stempel (S)"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1"/><rect x="5.5" y="9.5" width="13" height="5" rx=".5"/></svg><span class="lbl">Stempel</span></button>
+    </div>
+    <span class="sep"></span>
+    <button class="ib" id="btnSign" title="Underskrift (U)"><svg viewBox="0 0 24 24"><path d="M3 17c2-3 3.5-6 5-6s.5 5 2 5 2.5-3 4-3 1 2 2 2M15 4l5 5-8 8H7v-5z"/><path d="M3 21h18"/></svg><span class="lbl">Underskrift</span></button>
+    <span class="spacer"></span>
+    <button class="ib" id="btnUndo" title="Fortryd (Ctrl+Z)" aria-label="Fortryd"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
+    <button class="ib" id="btnRedo" title="Gentag (Ctrl+Y)" aria-label="Gentag"><svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3"/></svg></button>
+    <button class="ib scalebtn" id="btnScale" title="Skala for denne side"><svg viewBox="0 0 24 24"><path d="M3 17l14-14 4 4L7 21zM7 13l2 2M10 10l2 2M13 7l2 2"/></svg><span id="scaleTxt">Ingen skala</span></button>
+    <button class="ib" id="btnPrint" hidden title="Udskriv med synlige lag (Ctrl+P)" aria-label="Udskriv"><svg viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1h-2"/><rect x="6" y="14" width="12" height="7"/></svg></button>
+    <button class="primary" id="btnExport"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 19h16"/></svg>Eksportér</button>
+  </div>
+
+
+  <aside class="side" id="side">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="tabTool" aria-selected="false">Værktøj</button>
+      <button class="tab" role="tab" id="tabFiles" aria-selected="true">Filer</button>
+      <button class="tab" role="tab" id="tabPages" aria-selected="false">Sider</button>
+      <button class="tab" role="tab" id="tabLayers" aria-selected="false">Lag</button>
+      <button class="tab" role="tab" id="tabList" aria-selected="false">Liste</button>
+      <button class="tab" role="tab" id="tabFind" aria-selected="false">Søg</button>
+    </div>
+    <div class="pane" id="paneTool" hidden>
+    <section class="psec">
+      <div class="phead"><div><div class="plabel" id="pKind">Værktøj</div><div class="ptitle" id="pTitle">Vælg</div></div>
+        <button class="ghost done" id="pDone" title="Tilbage til Vælg og flyt">Færdig <kbd>Esc</kbd></button></div>
+      <p class="phint" id="hint"></p>
+    </section>
+    <section class="psec" id="secKit">
+      <h3>Værktøjskasse</h3>
+      <div class="kit" id="kitList"></div>
+      <p class="pnote" id="kitEmpty">Gem dine faste værktøjer og symboler her. Sæt et symbol ind med Ctrl+V fra et skærmklip, eller vælg et billede.</p>
+      <div style="display:flex;gap:14px;flex-wrap:wrap"><button type="button" class="linkbtn" id="kitSave">+ Gem nuværende som værktøj</button><button type="button" class="linkbtn" id="kitNewSym">+ Nyt symbol fra billede</button></div>
+      <input type="file" id="symFile" accept="image/*" hidden>
+      <div id="kitForm" class="kitform" hidden>
+        <b id="kitFormTitle" style="font-size:13px"></b>
+        <input class="num" id="kitName" placeholder="Navn, fx Kabelbakke" style="font-family:var(--sans)" aria-label="Værktøjets navn">
+        <input class="num" id="kitLayer" list="kitLayerList" placeholder="Standardlag (valgfrit), fx Kabelføring" style="font-family:var(--sans)" aria-label="Standardlag"><datalist id="kitLayerList"></datalist>
+        <div class="row" style="display:flex;gap:6px;justify-content:flex-end"><button type="button" class="ghost" id="kitCancel">Annullér</button><button type="button" class="primary" id="kitOk">Gem værktøj</button></div>
+      </div>
+    </section>
+    <section class="psec" id="secCount" hidden>
+      <h3 id="cHead">Grupper</h3>
+      <div class="cgroups" id="cGroups"></div>
+      <div style="display:flex;gap:6px"><input class="num" id="cNew" placeholder="Ny gruppe, fx Stikkontakt" style="font-family:var(--sans);flex:1" aria-label="Ny gruppe"><button type="button" class="ghost" id="cAdd">Tilføj</button></div>
+      <div class="prow" id="rCShape"><label class="plabel" for="cShape">Symbol</label><select class="sel" id="cShape"><option value="circle">Cirkel</option><option value="square">Firkant</option><option value="triangle">Trekant</option><option value="diamond">Rombe</option></select></div>
+      <div class="prow" id="rCColor"><span class="plabel">Farve</span><div class="swatches" id="cColor"></div></div>
+      <button type="button" class="ghost" id="cInsert">Indsæt optælling som tabel på siden</button>
+      <p class="pnote">Klik på tegningen for at tælle i den aktive gruppe. Backspace fjerner den seneste. Dobbeltklik på en gruppe for at omdøbe den.</p>
+    </section>
+    <section class="psec" id="secStamp" hidden>
+      <h3>Stempel</h3>
+      <div class="stamps" id="stampList"></div>
+      <div class="prow"><label class="plabel" for="stCustom">Egen tekst</label><input class="num" id="stCustom" placeholder="Fx MODTAGET" style="font-family:var(--sans)"></div>
+      <div id="rStOpts" style="display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;gap:16px"><label class="check"><input type="checkbox" id="stName"> Mit navn</label><label class="check"><input type="checkbox" id="stDate"> Dagens dato</label></div>
+        <p class="pnote warn" id="stNoName" hidden>Dit navn er ikke sat. <button type="button" class="linkbtn" id="stSet">Skriv det under Indstillinger</button></p>
+      </div>
+    </section>
+    <section class="psec" id="secStyle">
+      <h3>Udseende</h3>
+      <div class="prow" id="rColor"><span class="plabel">Farve</span><div class="swatches" id="pColor"></div></div>
+      <div class="prow" id="rWidth"><label class="plabel" for="pWidth">Stregtykkelse</label>
+        <select class="sel" id="pWidth"><option value="0.5">0,5 pt</option><option value="1">1 pt</option><option value="1.5">1,5 pt</option><option value="2">2 pt</option><option value="3">3 pt</option><option value="5">5 pt</option></select></div>
+      <div class="prow" id="rDash"><label class="plabel" for="pDash">Stregtype</label>
+        <select class="sel" id="pDash"><option value="solid">Fuld streg</option><option value="dash">Stiplet</option><option value="dot">Prikket</option><option value="cloud">Sky</option><option value="none">Ingen kant</option></select></div>
+      <div class="prow" id="rFill"><label class="plabel" for="pFill">Baggrund</label>
+        <select class="sel" id="pFill"><option value="none">Ingen</option><option value="white">Hvid</option><option value="yellow">Gul</option><option value="tint">Farvet, gennemsigtig</option></select></div>
+      <div class="prow" id="rArrows"><span class="plabel">Pilespidser</span><div class="pair">
+        <button class="ib" id="pArrS" aria-pressed="false" title="Pil i starten" aria-label="Pil i starten"><svg viewBox="0 0 24 24"><path d="M20 12H5M9 8l-4 4 4 4"/></svg></button>
+        <button class="ib" id="pArrE" aria-pressed="false" title="Pil i slutningen" aria-label="Pil i slutningen"><svg viewBox="0 0 24 24"><path d="M4 12h15M15 8l4 4-4 4"/></svg></button></div></div>
+      <div class="prow" id="rEnds"><label class="plabel" for="pEnds">Ender</label>
+        <select class="sel" id="pEnds"><option value="tick">Tværstreger</option><option value="arrow">Pile</option></select></div>
+      <div class="prow" id="rDim"><span class="plabel">Mål</span><div class="pair">
+        <label class="check"><input type="checkbox" id="pDim"> Vis mål</label>
+        <select class="sel" id="pDimKind" aria-label="Diameter eller radius"><option value="d">Diameter</option><option value="r">Radius</option></select></div></div>
+      <div class="prow" id="rLabel"><label class="plabel" for="pLabelMode">Tekst på mål</label>
+        <select class="sel" id="pLabelMode"><option value="auto">Automatisk</option><option value="manual">Skriv selv</option></select></div>
+      <button type="button" class="linkbtn" id="pLabReset">Flyt målet tilbage ved figuren</button>
+      <div class="prow" id="rLabelTxt"><span class="plabel"></span><input class="num" id="pLabel" aria-label="Egen tekst på målet" style="font-family:var(--sans)"></div>
+      <div class="prow" id="rSize"><label class="plabel" for="pSize">Tekststørrelse</label>
+        <select class="sel" id="pSize"><option value="6">6 pt</option><option value="8">8 pt</option><option value="10">10 pt</option><option value="12">12 pt</option><option value="14">14 pt</option><option value="18">18 pt</option><option value="24">24 pt</option></select></div>
+      <div class="prow" id="rLayer"><label class="plabel" for="pLayer">Lag</label><select class="sel" id="pLayer"></select></div>
+      <button class="danger" id="pDel"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>Slet markering</button>
+    </section>
+    <section class="psec" id="secFollow" hidden>
+      <h3>Opfølgning</h3>
+      <div class="prow"><label class="plabel" for="fStatus">Status</label><select class="sel" id="fStatus"><option value="">Ingen</option><option value="open">Åben</option><option value="progress">I gang</option><option value="done">Udbedret</option><option value="rejected">Afvist</option></select></div>
+      <div class="prow" style="align-items:start"><label class="plabel" for="fNote" style="padding-top:6px">Kommentar</label><textarea class="num" id="fNote" rows="3" style="height:auto;padding:6px 8px;font-family:var(--sans);resize:vertical"></textarea></div>
+      <p class="pnote" id="fMeta"></p>
+    </section>
+    <section class="psec" id="secUnit">
+      <h3>Mål</h3>
+      <div class="seg" role="group" aria-label="Måltype"><button type="button" id="mReal" aria-pressed="true">Virkelige mål</button><button type="button" id="mPaper" aria-pressed="false">Papirmål</button></div>
+      <p class="pnote" id="uNote"></p>
+      <button type="button" class="linkbtn" id="uSet">Skift enheder for denne PDF</button>
+      <div class="prow" id="rG1"><label class="plabel" for="g1" id="g1l">Længde</label><input class="num" id="g1" inputmode="decimal"></div>
+      <div class="prow" id="rG2"><label class="plabel" for="g2" id="g2l">Vinkel</label><input class="num" id="g2" inputmode="decimal"></div>
+    </section>
+    <section class="psec" id="secIns">
+      <h3>Indsæt figur ud fra mål</h3>
+      <div class="prow"><label class="plabel" for="iType">Figur</label>
+        <select class="sel" id="iType"><option value="line">Streg</option><option value="arrow">Pil</option><option value="measure">Målelinje</option><option value="rect">Rektangel</option><option value="circle">Cirkel</option></select></div>
+      <div class="prow" id="rICk"><label class="plabel" for="iCk">Angiv som</label>
+        <select class="sel" id="iCk"><option value="d">Diameter</option><option value="r">Radius</option></select></div>
+      <div class="prow"><label class="plabel" for="i1" id="i1l">Længde</label><input class="num" id="i1" inputmode="decimal" value="2"></div>
+      <div class="prow" id="rI2"><label class="plabel" for="i2" id="i2l">Vinkel</label><input class="num" id="i2" inputmode="decimal" value="0"></div>
+      <button class="primary" id="iGo">Indsæt på side 1</button>
+      <p class="pnote">Figuren lægges midt i det synlige udsnit og kan derefter flyttes.</p>
+    </section>
+    </div>
+    <div class="pane" id="paneFiles">
+      <div class="status">Filer og markeringer gemmes kun i denne browser.</div>
+      <div class="files" id="files"></div>
+    </div>
+    <div class="pane" id="panePages" hidden><div class="thumbs" id="thumbs"></div></div>
+    <div class="pane" id="paneLayers" hidden>
+      <div class="layers" id="layers"></div>
+      <button class="addlayer" id="addLayer">+ Nyt lag</button>
+      <div class="note">Nye markeringer lægges i det aktive lag. Klik på et lag for at gøre det aktivt, og brug øjet til at skjule det. Ved eksport kan lagene samles i én PDF eller gemmes hver for sig.</div>
+    </div>
+    <div class="pane" id="paneList" hidden>
+      <div class="lfilter"><select class="sel" id="lfStatus" aria-label="Filtrér på status"><option value="">Alle statusser</option><option value="open">Åben</option><option value="progress">I gang</option><option value="done">Udbedret</option><option value="rejected">Afvist</option><option value="none">Uden status</option></select>
+        <select class="sel" id="lfLayer" aria-label="Filtrér på lag"></select></div>
+      <div class="lsum" id="lSum"></div>
+      <div class="list" id="lItems"></div>
+      <button class="primary" id="lExport" style="width:100%;justify-content:center">Eksportér til Excel (CSV)</button>
+      <div class="note">Klik på en markering for at gå til den. Status og kommentar sættes under Værktøj, når markeringen er valgt.</div>
+    </div>
+    <div class="pane" id="paneFind" hidden><div class="status" id="findStatus">Skriv i søgefeltet for at søge.</div><div class="results" id="results"></div></div>
+  </aside>
+
+  <main class="main" id="main"><div class="viewer" id="viewer" tabindex="-1"></div></main>
+</div>
+
+<div class="modal" id="pwBox" hidden>
+  <form class="card" id="pwForm">
+    <h2>Dokumentet er beskyttet</h2>
+    <p id="pwMsg">Indtast adgangskoden for at åbne filen.</p>
+    <input class="txt" type="password" id="pwIn" autocomplete="off" aria-label="Adgangskode">
+    <div class="row end"><button type="button" class="ghost" id="pwCancel">Annullér</button><button class="primary" type="submit">Åbn</button></div>
+  </form>
+</div>
+
+<div class="modal" id="scaleBox" hidden>
+  <form class="card" id="scaleForm">
+    <h2>Skala</h2>
+    <p>Nuværende skala på side <span id="scPage">1</span>: <b class="big" id="scNow">ingen</b></p>
+    <fieldset><legend>Indtast målestoksforhold</legend>
+      <div class="row"><span class="big">1 :</span><input class="txt" id="ratioIn" inputmode="decimal" style="width:7em" aria-label="Målestok"><button type="button" class="primary" id="ratioApply">Brug</button></div>
+      <small class="hint" style="padding:0">Forudsætter at PDF'en er gemt i den rigtige papirstørrelse.</small>
+    </fieldset>
+    <div class="or">eller</div>
+    <fieldset><legend>Kalibrér ud fra et kendt mål</legend>
+      <button type="button" class="ghost" id="calStart">Mål et stykke på tegningen</button>
+      <div id="calBox" class="row" hidden>
+        <span>Målt stykke er</span><input class="txt" id="calLen" inputmode="decimal" style="width:6em" aria-label="Virkelig længde">
+        <select class="sel" id="calUnit" aria-label="Enhed"><option value="m">m</option><option value="cm">cm</option><option value="mm">mm</option></select>
+        <button type="button" class="primary" id="calApply">Brug</button>
+      </div>
+    </fieldset>
+    <fieldset><legend>Gælder for</legend>
+      <div class="row"><label class="opt"><input type="radio" name="scAll" id="scThis" value="page"> Denne side</label><label class="opt"><input type="radio" name="scAll" id="scAllPages" value="all" checked> Alle sider</label></div>
+    </fieldset>
+    <div class="row"><button type="button" class="linkbtn" id="scUnits">Enheder …</button>
+      <span class="spacer"></span><button type="button" class="ghost" id="scClear">Fjern skala</button><button type="button" class="ghost" id="scClose">Luk</button></div>
+  </form>
+</div>
+
+<div class="modal" id="expBox" hidden>
+  <form class="card" id="expForm">
+    <h2>Eksportér med markeringer</h2>
+    <fieldset><legend>Format</legend>
+      <label class="opt"><input type="radio" name="expMode" value="ocg" checked><span>Samlet PDF med lag<small>Lagene kan slås til og fra i Adobe, Bluebeam og lignende.</small></span></label>
+      <label class="opt"><input type="radio" name="expMode" value="flat"><span>Samlet PDF, fladt<small>Markeringer og eventuelle formularfelter låses fast på siderne. Teksten kan stadig søges i.</small></span></label>
+      <label class="opt"><input type="radio" name="expMode" value="img"><span>Låst billedkopi<small>Hver side gemmes som et billede. Sværest at ændre, men teksten kan ikke søges i, og filen bliver større.</small></span></label>
+      <label class="opt"><input type="radio" name="expMode" value="sep"><span>Én PDF pr. lag<small>Hver fil indeholder dokumentet med ét lag, fladt og med låste formularfelter.</small></span></label>
+    </fieldset>
+    <p class="pnote" id="expSigNote" hidden>Dokumentet har en underskrift. "Fladt" er valgt, så underskrift og formularfelter låses fast. Vælg "Låst billedkopi" for den stærkeste beskyttelse.</p>
+    <fieldset><legend>Lag der kommer med</legend><div id="expLayers"></div></fieldset>
+    <p id="expMsg"></p>
+    <div class="row end"><button type="button" class="ghost" id="expCancel">Annullér</button><button class="primary" type="submit" id="expGo">Gem PDF</button></div>
+  </form>
+</div>
+
+<div class="modal" id="sigBox" hidden>
+  <div class="card sigcard" role="dialog" aria-labelledby="sigTitle">
+    <h2 id="sigTitle">Underskrift</h2>
+    <div id="sigSavedWrap" hidden style="display:flex;flex-direction:column;gap:6px">
+      <span class="plabel">Gemte underskrifter – klik for at bruge</span>
+      <div class="sigsaved" id="sigSaved"></div>
+    </div>
+    <div class="seg" role="group" aria-label="Måde">
+      <button type="button" id="sm_draw" aria-pressed="true">Tegn</button><button type="button" id="sm_type" aria-pressed="false">Skriv</button><button type="button" id="sm_img" aria-pressed="false">Billede</button>
+    </div>
+    <div id="sp_draw" style="display:flex;flex-direction:column;gap:8px">
+      <div class="sigpadwrap"><canvas class="sigpad" id="sigPad" aria-label="Tegn din underskrift her"></canvas><div class="sigpadhint" id="sigPadHint">Skriv din underskrift her med mus, pen eller finger</div></div>
+      <div class="row"><button type="button" class="ghost" id="sigUndoStroke">Fortryd streg</button><button type="button" class="ghost" id="sigClear">Ryd</button></div>
+    </div>
+    <div id="sp_type" hidden style="display:flex;flex-direction:column;gap:8px">
+      <input class="txt" id="sigName" placeholder="Dit fulde navn" autocomplete="name" aria-label="Dit navn">
+      <div class="fontopts"><button type="button" class="fontopt"></button><button type="button" class="fontopt"></button><button type="button" class="fontopt"></button></div>
+    </div>
+    <div id="sp_img" hidden style="display:flex;flex-direction:column;gap:8px">
+      <p>Tag et billede eller en scanning af din underskrift på hvidt papir. Den hvide baggrund fjernes automatisk.</p>
+      <label class="ghost" style="display:inline-flex;align-items:center;justify-content:center;cursor:pointer;align-self:flex-start">Vælg billede …<input type="file" id="sigFile" accept="image/*" hidden></label>
+      <div class="imgprev" id="sigImgPrev"><span class="hint">Intet billede valgt</span></div>
+    </div>
+    <div class="row"><span class="plabel">Farve</span><button type="button" class="sigcol" data-c="#1a2b6d" style="background:#1a2b6d" aria-pressed="true" aria-label="Blå"></button><button type="button" class="sigcol" data-c="#111111" style="background:#111111" aria-pressed="false" aria-label="Sort"></button><span class="plabel">(tegn og skriv)</span></div>
+    <label class="check"><input type="checkbox" id="sigSave" checked> Gem til næste gang (kun i denne browser)</label>
+    <label class="check"><input type="checkbox" id="sigDate"> Indsæt dagens dato under underskriften</label>
+    <div class="row end"><button type="button" class="ghost" id="sigCancel">Annullér</button><button type="button" class="primary" id="sigUse">Placér underskrift</button></div>
+  </div>
+</div>
+<div class="modal" id="symBox" hidden>
+  <div class="card" role="dialog" aria-labelledby="symTitle">
+    <h2 id="symTitle">Nyt symbol</h2>
+    <div class="symprev" id="symPrev"></div>
+    <div class="prow"><label class="plabel" for="symThr">Fjern baggrund</label><input type="range" id="symThr" min="0" max="100" value="12"></div>
+    <div class="prow"><span class="plabel">Farve</span><div style="display:flex;align-items:center;gap:10px"><label class="check"><input type="checkbox" id="symMono"> Ensfarvet</label><input type="color" id="symColor" value="#e03131" disabled aria-label="Farve"></div></div>
+    <div class="prow"><label class="plabel" for="symName">Navn</label><input class="txt" id="symName" placeholder="Fx Inverter, Tavle, Brandskilt"></div>
+    <div class="prow"><label class="plabel" for="symLayer">Standardlag</label><input class="txt" id="symLayer" list="symLayerList" placeholder="Valgfrit, fx Udstyr"><datalist id="symLayerList"></datalist></div>
+    <p>Symbolet gemmes i værktøjskassen og lægges i standardlaget, når du sætter det ind. Du kan vælge et andet lag for den enkelte PDF bagefter.</p>
+    <div class="row end"><button type="button" class="ghost" id="symCancel">Annullér</button><button type="button" class="primary" id="symOk">Gem symbol</button></div>
+  </div>
+</div>
+<div class="modal" id="cmpBox" hidden>
+  <div class="card cmpcard" role="dialog" aria-labelledby="cmpTitle">
+    <div style="display:flex;align-items:center;gap:8px"><h2 id="cmpTitle" style="flex:1">Sammenlign revisioner</h2><button type="button" class="ghost" id="cmpClose">Luk</button></div>
+    <div class="cmpctl">
+      <div class="prow"><label class="plabel" for="cmpFile">Sammenlign med</label><select class="sel" id="cmpFile" style="max-width:none"></select></div>
+      <div class="prow"><label class="plabel" for="cmpRole">Den åbne PDF er</label><select class="sel" id="cmpRole" style="max-width:none"><option value="new">den nye revision</option><option value="old">den gamle revision</option></select></div>
+      <div class="prow"><label class="plabel" for="cmpPageA">Side i åben PDF</label><input class="num" id="cmpPageA" type="number" min="1" value="1"></div>
+      <div class="prow"><label class="plabel" for="cmpPageB">Side i den anden</label><input class="num" id="cmpPageB" type="number" min="1" value="1"></div>
+    </div>
+    <input type="file" id="cmpIn" accept="application/pdf,.pdf" hidden>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button type="button" class="primary" id="cmpRun">Sammenlign</button>
+      <div class="cmplegend"><span><i style="background:#e03131"></i>Kun i gammel</span><span><i style="background:#1971c2"></i>Kun i ny</span><span><i style="background:#a5abb2"></i>Uændret</span><b id="cmpInfo" style="color:var(--fg);font-weight:500"></b></div></div>
+    <div class="cmpview" id="cmpView" title="Klik for at zoome"><canvas id="cmpCanvas" width="10" height="10"></canvas></div>
+    <div style="display:flex;justify-content:flex-end"><button type="button" class="primary" id="cmpCloud" disabled>Sæt skyer om ændringerne</button></div>
+  </div>
+</div>
+<div class="modal" id="setBox" hidden>
+  <form class="card" id="setForm">
+    <h2>Indstillinger</h2>
+    <p>Enheden bruges både til de mål, der vises på tegningen, og når du skriver mål ind.</p>
+    <fieldset><legend>Dig</legend>
+      <div class="row"><label class="plabel" style="width:110px" for="sName">Dit navn</label><input class="txt" id="sName" autocomplete="name" placeholder="Bruges på stempler og i markeringslisten" style="flex:1"></div>
+    </fieldset>
+    <fieldset><legend>Denne PDF</legend>
+      <div class="row"><label class="plabel" style="width:110px" for="sU">Virkelige mål</label><select class="sel" id="sU"><option value="m">meter (m)</option><option value="cm">centimeter (cm)</option><option value="mm">millimeter (mm)</option></select></div>
+      <div class="row"><label class="plabel" style="width:110px" for="sP">Papirmål</label><select class="sel" id="sP"><option value="mm">millimeter (mm)</option><option value="cm">centimeter (cm)</option></select></div>
+      <div class="row"><label class="plabel" style="width:110px" for="sD">Decimaler</label><select class="sel" id="sD"><option value="auto">Automatisk</option><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
+    </fieldset>
+    <fieldset><legend>Standard for nye PDF'er</legend>
+      <div class="row"><label class="plabel" style="width:110px" for="dU">Virkelige mål</label><select class="sel" id="dU"><option value="m">meter (m)</option><option value="cm">centimeter (cm)</option><option value="mm">millimeter (mm)</option></select></div>
+      <div class="row"><label class="plabel" style="width:110px" for="dP">Papirmål</label><select class="sel" id="dP"><option value="mm">millimeter (mm)</option><option value="cm">centimeter (cm)</option></select></div>
+      <div class="row"><label class="plabel" style="width:110px" for="dD">Decimaler</label><select class="sel" id="dD"><option value="auto">Automatisk</option><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
+      <button type="button" class="linkbtn" id="setCopy">Kopiér fra denne PDF</button>
+    </fieldset>
+    <p class="pnote">Bladr version 2026.11.01-1840</p>
+    <div class="row end"><button type="button" class="ghost" id="setCancel">Annullér</button><button class="primary" type="submit">Gem</button></div>
+  </form>
+</div>
+<div class="drop" id="drop" hidden><div>Slip en PDF for at åbne den, eller et billede for at lave et symbol</div></div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="vendor/pdf.min.js"></script>
+<script src="vendor/pdf-lib.min.js"></script>
+<script>
+/* Bladr core: geometri for markeringer + PDF-eksport. Koordinater er "visningsrum": pt ved zoom 1, origo øverst til venstre, siden som den vises uden ekstra rotation. */
+var BladrCore = (function(){
+const K = 0.5523, PAD = 4;
+let measureFn = (s, size, bold) => s.length * size * (bold ? 0.6 : 0.52);
+function setMeasure(fn){ measureFn = fn; }
+
+const PT_MM = 25.4 / 72;
+function fmtLen(pt, ctx){
+  const c = ctx||{}, d = c.dec && c.dec!=='auto' ? +c.dec : null;
+  const f = (v,p) => v.toLocaleString('da-DK',{minimumFractionDigits:p,maximumFractionDigits:p});
+  if(!c.scale){ const pu = c.paperUnit==='cm' ? 'cm' : 'mm', v = pt*PT_MM/(pu==='cm'?10:1);
+    return f(v, d ?? (pu==='cm'?1:0)) + ' ' + pu + ' (papir)'; }
+  const m = pt*c.scale, u = c.unit||'m';
+  if(u==='mm') return f(m*1000, d ?? 0) + ' mm';
+  if(u==='cm') return f(m*100, d ?? 1) + ' cm';
+  return f(m, d ?? 2) + ' m';
+}
+
+function dashFor(a){ const w = a.width||1;
+  if(a.dash === 'dash') return {arr:[4*w+2, 2*w+2], cap:0};
+  if(a.dash === 'dot') return {arr:[0.01, 2*w+1.5], cap:1};
+  return {arr:null, cap:0};
+}
+function arrowLen(w){ return 5 + 3*w; }
+function arrowHead(sx, sy, tx, ty, w){
+  const L = arrowLen(w), d = Math.hypot(tx-sx, ty-sy) || 1, ux = (tx-sx)/d, uy = (ty-sy)/d, hw = L*0.38;
+  const bx = tx - ux*L, by = ty - uy*L;
+  return [['M',tx,ty],['L',bx - uy*hw, by + ux*hw],['L',bx + uy*hw, by - ux*hw],['Z']];
+}
+function cloudOps(x, y, w, h, width){
+  const d = 10 + 2*width, ops = [['M',x,y]];
+  const pts = [[x,y],[x+w,y],[x+w,y+h],[x,y+h]];
+  for(let e=0;e<4;e++){
+    const [ax,ay] = pts[e], [bx,by] = pts[(e+1)%4];
+    const len = Math.hypot(bx-ax, by-ay); if(len < 0.5) continue;
+    const n = Math.max(1, Math.round(len/d)), ux = (bx-ax)/len, uy = (by-ay)/len, nx = uy, ny = -ux, seg = len/n, r = seg/2;
+    for(let i=0;i<n;i++){
+      const px = ax+ux*seg*i, py = ay+uy*seg*i, qx = px+ux*seg, qy = py+uy*seg, tx = px+ux*r+nx*r, ty = py+uy*r+ny*r;
+      ops.push(['C', px+nx*r*K, py+ny*r*K, tx-ux*r*K, ty-uy*r*K, tx, ty]);
+      ops.push(['C', tx+ux*r*K, ty+uy*r*K, qx+nx*r*K, qy+ny*r*K, qx, qy]);
+    }
+  }
+  ops.push(['Z']); return ops;
+}
+function rectOps(x,y,w,h){ return [['M',x,y],['L',x+w,y],['L',x+w,y+h],['L',x,y+h],['Z']]; }
+function circleOps(cx,cy,r){ const k=r*K; return [['M',cx+r,cy],['C',cx+r,cy+k,cx+k,cy+r,cx,cy+r],['C',cx-k,cy+r,cx-r,cy+k,cx-r,cy],['C',cx-r,cy-k,cx-k,cy-r,cx,cy-r],['C',cx+k,cy-r,cx+r,cy-k,cx+r,cy],['Z']]; }
+function cloudCircleOps(cx,cy,r,width){
+  const d=10+2*width, n=Math.max(8,Math.round(2*Math.PI*r/d)), ops=[['M',cx+r,cy]];
+  for(let i=0;i<n;i++){
+    const a0=i*2*Math.PI/n, a1=(i+1)*2*Math.PI/n, am=(a0+a1)/2;
+    const p0=[cx+r*Math.cos(a0),cy+r*Math.sin(a0)], p1=[cx+r*Math.cos(a1),cy+r*Math.sin(a1)];
+    const c=Math.hypot(p1[0]-p0[0],p1[1]-p0[1]), h=(4/3)*(c/2), nx=Math.cos(am), ny=Math.sin(am);
+    ops.push(['C',p0[0]+nx*h,p0[1]+ny*h,p1[0]+nx*h,p1[1]+ny*h,p1[0],p1[1]]);
+  }
+  ops.push(['Z']); return ops;
+}
+/* Måltekst: centreret i (x,y), drejet rot (radianer, y nedad), med hvid baggrund */
+function labelPrims(out, l, color){
+  const c = Math.cos(l.rot||0), s = Math.sin(l.rot||0), R = (px,py) => [l.x+px*c-py*s, l.y+px*s+py*c];
+  const hw = l.w/2, hh = l.h/2, p = [R(-hw,-hh),R(hw,-hh),R(hw,hh),R(-hw,hh)];
+  out.push({k:'path', ops:[['M',...p[0]],['L',...p[1]],['L',...p[2]],['L',...p[3]],['Z']], stroke:null, fill:'#ffffff'});
+  const lines = String(l.str).split('\n'), top = -hh + l.size*0.2;
+  lines.forEach((ln,i) => { const lw = measureFn(ln, l.size), t = R(-lw/2, top + l.size*0.85 + i*l.size*1.25);
+    out.push({k:'text', x:t[0], y:t[1], str:ln, size:l.size, color, rot:l.rot||0}); });
+}
+function normRot(t){ while(t > Math.PI/2+1e-9) t -= Math.PI; while(t <= -Math.PI/2+1e-9) t += Math.PI; return t; }
+/* Målenes standardplacering: ved siden af og langs med figuren. a.lo / a.lo2 er brugerens forskydning. */
+function dimLabels(a, ctx){
+  const s = a.size||10, w = a.width||1, L = [], F = pt => fmtLen(pt, ctx), off = o => o||{x:0,y:0};
+  if(a.type==='measure' || (a.type==='line' && a.showDim)){
+    const dx = a.x2-a.x1, dy = a.y2-a.y1, d = Math.hypot(dx,dy)||1, rot = normRot(Math.atan2(dy,dx));
+    const nx = Math.sin(rot), ny = -Math.cos(rot), g = s*0.65 + w/2 + 3 + (a.type==='line' && (a.arrowEnd||a.arrowStart) ? 2 : 0);
+    const str = a.type==='measure' ? ((a.label && a.label.trim()) || F(d)) : F(d), o = off(a.lo);
+    L.push({key:'lo', str, x:(a.x1+a.x2)/2 + nx*g + o.x, y:(a.y1+a.y2)/2 + ny*g + o.y, rot, size:s});
+  } else if(a.type==='rect' && a.showDim){
+    const g = s*0.65 + w/2 + 3 + (a.dash==='cloud' ? (10+2*w)/2 : 0), o = off(a.lo), o2 = off(a.lo2);
+    L.push({key:'lo', str:F(a.w), x:a.x+a.w/2+o.x, y:a.y-g+o.y, rot:0, size:s});
+    L.push({key:'lo2', str:F(a.h), x:a.x+a.w+g+o2.x, y:a.y+a.h/2+o2.y, rot:-Math.PI/2, size:s});
+  } else if(a.type==='poly' && a.pts && a.pts.length >= 4){
+    const p = a.pts, n = p.length/2;
+    if(a.showDim) for(let i=1;i<n;i++){
+      const x1=p[2*i-2], y1=p[2*i-1], x2=p[2*i], y2=p[2*i+1], d=Math.hypot(x2-x1,y2-y1); if(d < 1) continue;
+      const rot = normRot(Math.atan2(y2-y1,x2-x1)), g = s*0.65 + w/2 + 3, o = off(a['ls'+i]);
+      L.push({key:'ls'+i, str:F(d), x:(x1+x2)/2+Math.sin(rot)*g+o.x, y:(y1+y2)/2-Math.cos(rot)*g+o.y, rot, size:s});
+    }
+    const x1=p[2*n-4], y1=p[2*n-3], x2=p[2*n-2], y2=p[2*n-1], d=Math.hypot(x2-x1,y2-y1)||1, ux=(x2-x1)/d, uy=(y2-y1)/d;
+    const str = 'L = ' + F(polyLen(p,false)), tw = measureFn(str, s) + 6, rot = normRot(Math.atan2(uy,ux)), o = off(a.lo);
+    L.push({key:'lo', str, x:x2+ux*(tw/2+6)+o.x, y:y2+uy*(tw/2+6)+o.y+(Math.abs(uy)>0.9?0:0), rot, size:s});
+  } else if(a.type==='area' && a.pts && a.pts.length >= 6){
+    const c = centroid(a.pts), o = off(a.lo);
+    L.push({key:'lo', str:'A = '+fmtArea(polyArea(a.pts), ctx)+'\nO = '+F(polyLen(a.pts,true)), x:c[0]+o.x, y:c[1]+o.y, rot:0, size:s});
+  } else if(a.type==='circle' && a.showDim){
+    const g = s*0.65 + 3, o = off(a.lo);
+    if(a.dimKind==='r') L.push({key:'lo', str:'R '+F(a.r), x:a.cx+a.r/2+o.x, y:a.cy-g+o.y, rot:0, size:s});
+    else L.push({key:'lo', str:'Ø '+F(2*a.r), x:a.cx+o.x, y:a.cy-g+o.y, rot:0, size:s});
+  }
+  L.forEach(l => { const ls = String(l.str).split('\n'); l.w = Math.max(...ls.map(x => measureFn(x, l.size))) + 6; l.h = l.size*(0.4 + 1.25*ls.length) - l.size*0.35; });
+  return L;
+}
+function smoothOps(P){
+  if(P.length < 3) return [['M',P[0][0],P[0][1]],['L',(P[1]||P[0])[0]+(P[1]?0:0.01),(P[1]||P[0])[1]]];
+  const ops = [['M',P[0][0],P[0][1]]]; let pv = P[0];
+  for(let i=1;i<P.length-1;i++){
+    const q = P[i], m = [(P[i][0]+P[i+1][0])/2, (P[i][1]+P[i+1][1])/2];
+    ops.push(['C', pv[0]+2/3*(q[0]-pv[0]), pv[1]+2/3*(q[1]-pv[1]), m[0]+2/3*(q[0]-m[0]), m[1]+2/3*(q[1]-m[1]), m[0], m[1]]); pv = m;
+  }
+  const L = P[P.length-1]; ops.push(['L',L[0],L[1]]); return ops;
+}
+function b64Bytes(src){ const b = src.slice(src.indexOf(',')+1);
+  if(typeof atob === 'function'){ const s = atob(b), u = new Uint8Array(s.length); for(let i=0;i<s.length;i++) u[i]=s.charCodeAt(i); return u; }
+  return Uint8Array.from(Buffer.from(b,'base64')); }
+function polyLen(p, closed){ let L=0; for(let i=2;i<p.length;i+=2) L+=Math.hypot(p[i]-p[i-2],p[i+1]-p[i-1]);
+  if(closed && p.length>=6) L+=Math.hypot(p[0]-p[p.length-2],p[1]-p[p.length-1]); return L; }
+function polyArea(p){ let s=0; const n=p.length/2; for(let i=0;i<n;i++){ const j=(i+1)%n; s+=p[2*i]*p[2*j+1]-p[2*j]*p[2*i+1]; } return Math.abs(s)/2; }
+function centroid(p){ const n=p.length/2; let A=0,cx=0,cy=0;
+  for(let i=0;i<n;i++){ const j=(i+1)%n, f=p[2*i]*p[2*j+1]-p[2*j]*p[2*i+1]; A+=f; cx+=(p[2*i]+p[2*j])*f; cy+=(p[2*i+1]+p[2*j+1])*f; }
+  if(Math.abs(A) < 1e-6){ let sx=0,sy=0; for(let i=0;i<n;i++){sx+=p[2*i];sy+=p[2*i+1];} return [sx/n,sy/n]; }
+  return [cx/(3*A), cy/(3*A)]; }
+function fmtArea(pt2, ctx){
+  const c = ctx||{}, d = c.dec && c.dec!=='auto' ? +c.dec : null, f = (v,p) => v.toLocaleString('da-DK',{minimumFractionDigits:p,maximumFractionDigits:p});
+  if(!c.scale){ const pu = c.paperUnit==='cm' ? 'cm' : 'mm', k = PT_MM/(pu==='cm'?10:1); return f(pt2*k*k, d ?? (pu==='cm'?1:0)) + ' ' + pu + '² (papir)'; }
+  const m2 = pt2*c.scale*c.scale, u = c.unit||'m';
+  if(u==='mm') return f(m2*1e6, d ?? 0) + ' mm²';
+  if(u==='cm') return f(m2*1e4, d ?? 0) + ' cm²';
+  return f(m2, d ?? 2) + ' m²';
+}
+function fillOf(a, col){ return a.fill==='tint' ? {fill:col, op:0.2} : {fill:FILLS[a.fill]||null, op:1}; }
+function stampBox(a){
+  const s=a.size||14, pad=s*0.45, ss=s*0.56, lw=measureFn(a.label||'', s, true), sw=a.sub ? measureFn(a.sub, ss) : 0;
+  return {x:a.x, y:a.y, w:Math.max(lw,sw)+2*pad+s*0.3, h:s*1.05+(a.sub?ss*1.4:0)+2*pad, s, pad, ss, lw, sw};
+}
+function markerOps(shape, x, y, r){
+  if(shape==='square') return rectOps(x-r*0.9,y-r*0.9,r*1.8,r*1.8);
+  if(shape==='triangle') return [['M',x,y-r*1.2],['L',x+r*1.1,y+r*0.75],['L',x-r*1.1,y+r*0.75],['Z']];
+  if(shape==='diamond') return [['M',x,y-r*1.25],['L',x+r*1.25,y],['L',x,y+r*1.25],['L',x-r*1.25,y],['Z']];
+  return circleOps(x,y,r);
+}
+const FILLS = {none:null, white:'#ffffff', yellow:'#fff3a8'};
+
+function textBox(a){
+  const lines = (a.text||'').split('\n'), lh = a.size*1.2;
+  const w = Math.max(16, ...lines.map(l => measureFn(l, a.size))) + 2*PAD;
+  return {x:a.x, y:a.y, w, h: lines.length*lh + 2*PAD, lines, lh};
+}
+function edgePoint(b, tx, ty){
+  const cx = b.x+b.w/2, cy = b.y+b.h/2, dx = tx-cx, dy = ty-cy;
+  if(Math.abs(dx) <= b.w/2 && Math.abs(dy) <= b.h/2) return null;
+  const t = Math.min(dx ? (b.w/2)/Math.abs(dx) : Infinity, dy ? (b.h/2)/Math.abs(dy) : Infinity);
+  return [cx+dx*t, cy+dy*t];
+}
+function bbox(a){
+  if(a.type==='line'||a.type==='measure') return {x:Math.min(a.x1,a.x2), y:Math.min(a.y1,a.y2), w:Math.abs(a.x2-a.x1), h:Math.abs(a.y2-a.y1)};
+  if(a.type==='rect') return {x:a.x,y:a.y,w:a.w,h:a.h};
+  if(a.type==='circle') return {x:a.cx-a.r,y:a.cy-a.r,w:2*a.r,h:2*a.r};
+  if(a.type==='sign'||a.type==='symbol') return {x:a.x,y:a.y,w:a.w,h:a.h};
+  if(a.type==='stamp'){ const b=stampBox(a); return {x:b.x,y:b.y,w:b.w,h:b.h}; }
+  if(a.type==='count'){ const r=(a.size||9)/2*1.3; return {x:a.x-r,y:a.y-r,w:2*r,h:2*r}; }
+  if(a.type==='poly'||a.type==='area'){ const p=a.pts||[0,0]; let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; for(let i=0;i<p.length;i+=2){x0=Math.min(x0,p[i]);x1=Math.max(x1,p[i]);y0=Math.min(y0,p[i+1]);y1=Math.max(y1,p[i+1]);} return {x:x0,y:y0,w:x1-x0,h:y1-y0}; }
+  return textBox(a);
+}
+
+/* Primitiver: {k:'path', ops, stroke, fill, width, dash, cap} | {k:'text', x, y, str, size, color} */
+function prims(a, ctx){
+  const out = [], col = a.color, w = a.width||1, ds = dashFor(a);
+  const line = (ops, extra={}) => out.push(Object.assign({k:'path', ops, stroke:col, fill:null, width:w, dash:ds.arr, cap:ds.cap}, extra));
+  if(a.type === 'line'){
+    let {x1,y1,x2,y2} = a; const d = Math.hypot(x2-x1,y2-y1)||1, ux=(x2-x1)/d, uy=(y2-y1)/d, cut = arrowLen(w)*0.7;
+    const sx = a.arrowStart ? x1+ux*cut : x1, sy = a.arrowStart ? y1+uy*cut : y1;
+    const ex = a.arrowEnd ? x2-ux*cut : x2, ey = a.arrowEnd ? y2-uy*cut : y2;
+    line([['M',sx,sy],['L',ex,ey]]);
+    if(a.arrowEnd) out.push({k:'path', ops:arrowHead(x1,y1,x2,y2,w), stroke:null, fill:col});
+    if(a.arrowStart) out.push({k:'path', ops:arrowHead(x2,y2,x1,y1,w), stroke:null, fill:col});
+  }
+  else if(a.type === 'measure'){
+    const {x1,y1,x2,y2} = a, d = Math.hypot(x2-x1,y2-y1)||1, ux=(x2-x1)/d, uy=(y2-y1)/d, nx = -uy*5, ny = ux*5;
+    if(a.ends === 'arrow'){
+      const cut = arrowLen(w)*0.7, e = 1.5;
+      line([['M',x1+ux*cut,y1+uy*cut],['L',x2-ux*cut,y2-uy*cut],['M',x1+nx*e,y1+ny*e],['L',x1-nx*e,y1-ny*e],['M',x2+nx*e,y2+ny*e],['L',x2-nx*e,y2-ny*e]], {dash:null, cap:0});
+      out.push({k:'path', ops:arrowHead(x2,y2,x1,y1,w), stroke:null, fill:col});
+      out.push({k:'path', ops:arrowHead(x1,y1,x2,y2,w), stroke:null, fill:col});
+    } else {
+      line([['M',x1,y1],['L',x2,y2],['M',x1+nx,y1+ny],['L',x1-nx,y1-ny],['M',x2+nx,y2+ny],['L',x2-nx,y2-ny]], {dash:null, cap:0});
+    }
+  }
+  else if(a.type === 'rect'){
+    const ops = a.dash==='cloud' ? cloudOps(a.x,a.y,a.w,a.h,w) : rectOps(a.x,a.y,a.w,a.h);
+    { const fo = fillOf(a,col); out.push({k:'path', ops, stroke: a.dash==='none'?null:col, fill:fo.fill, op:fo.op, width:w, dash:ds.arr, cap:ds.cap}); }
+  }
+  else if(a.type === 'circle'){
+    const ops = a.dash==='cloud' ? cloudCircleOps(a.cx,a.cy,a.r,w) : circleOps(a.cx,a.cy,a.r);
+    { const fo = fillOf(a,col); out.push({k:'path', ops, stroke: a.dash==='none'?null:col, fill:fo.fill, op:fo.op, width:w, dash:ds.arr, cap:ds.cap}); }
+    if(a.showDim){
+      const lw=0.75, cut=arrowLen(lw)*0.7, s=a.size||10, {cx,cy,r}=a, sc=ctx&&ctx.scale, un=ctx&&ctx.unit;
+      out.push({k:'path', ops:[['M',cx,cy-2],['L',cx,cy+2],['M',cx-2,cy],['L',cx+2,cy]], stroke:col, fill:null, width:lw, dash:null, cap:0});
+      if(a.dimKind==='r'){
+        out.push({k:'path', ops:[['M',cx,cy],['L',cx+r-cut,cy]], stroke:col, fill:null, width:lw, dash:null, cap:0});
+        out.push({k:'path', ops:arrowHead(cx,cy,cx+r,cy,lw), stroke:null, fill:col});
+      } else {
+        out.push({k:'path', ops:[['M',cx-r+cut,cy],['L',cx+r-cut,cy]], stroke:col, fill:null, width:lw, dash:null, cap:0});
+        out.push({k:'path', ops:arrowHead(cx,cy,cx+r,cy,lw), stroke:null, fill:col});
+        out.push({k:'path', ops:arrowHead(cx,cy,cx-r,cy,lw), stroke:null, fill:col});
+      }
+    }
+  }
+  else if(a.type === 'poly' || a.type === 'area'){
+    const p = a.pts||[], closed = a.type==='area'; if(p.length >= 4){
+      const ops = [['M',p[0],p[1]]]; for(let i=2;i<p.length;i+=2) ops.push(['L',p[i],p[i+1]]); if(closed) ops.push(['Z']);
+      const fo = closed ? fillOf(a,col) : {fill:null, op:1};
+      out.push({k:'path', ops, stroke:a.dash==='none'?null:col, fill:fo.fill, op:fo.op, width:w, dash:ds.arr, cap:ds.cap}); }
+  }
+  else if(a.type === 'count'){
+    const g = ((ctx && ctx.groups) || []).find(g => g.id===a.group) || {color:'#e03131', shape:'circle'}, r = (a.size||9)/2;
+    out.push({k:'path', ops:markerOps(g.shape, a.x, a.y, r), stroke:'#ffffff', fill:g.color, width:Math.max(0.6, r*0.22), dash:null, cap:0});
+  }
+  else if(a.type === 'stamp'){
+    const b = stampBox(a), s = b.s, i = s*0.2;
+    out.push({k:'path', ops:rectOps(b.x,b.y,b.w,b.h), stroke:col, fill:null, width:s*0.11, dash:null, cap:0});
+    out.push({k:'path', ops:rectOps(b.x+i,b.y+i,b.w-2*i,b.h-2*i), stroke:col, fill:null, width:s*0.035, dash:null, cap:0});
+    out.push({k:'text', x:b.x+(b.w-b.lw)/2, y:b.y+b.pad+s*0.85, str:a.label||'', size:s, color:col, bold:true});
+    if(a.sub) out.push({k:'text', x:b.x+(b.w-b.sw)/2, y:b.y+b.pad+s*1.05+b.ss*1.15, str:a.sub, size:b.ss, color:col});
+  }
+  else if(a.type === 'sign' || a.type === 'symbol'){
+    if(a.src) out.push({k:'image', x:a.x, y:a.y, w:a.w, h:a.h, src:a.src});
+    else if(a.ink){ const lw = Math.max(0.3, (a.lw||0.03)*a.h);
+      a.ink.forEach(pth => { const P=[]; for(let i=0;i<pth.length;i+=2) P.push([a.x+pth[i]*a.w, a.y+pth[i+1]*a.h]);
+        if(P.length) out.push({k:'path', ops:smoothOps(P), stroke:col||'#111111', fill:null, width:lw, dash:null, cap:1}); }); }
+  }
+  else if(a.type === 'text'){
+    const b = textBox(a);
+    if(a.leader){
+      const e = edgePoint(b, a.leader.x, a.leader.y);
+      if(e){ const lw = Math.max(w, 0.75), d = Math.hypot(a.leader.x-e[0], a.leader.y-e[1])||1, cut = arrowLen(lw)*0.7;
+        out.push({k:'path', ops:[['M',e[0],e[1]],['L',a.leader.x-(a.leader.x-e[0])/d*cut, a.leader.y-(a.leader.y-e[1])/d*cut]], stroke:col, fill:null, width:lw, dash:null, cap:0});
+        out.push({k:'path', ops:arrowHead(e[0],e[1],a.leader.x,a.leader.y,lw), stroke:null, fill:col}); }
+    }
+    const ops = a.dash==='cloud' ? cloudOps(b.x,b.y,b.w,b.h,w) : rectOps(b.x,b.y,b.w,b.h);
+    const stroke = a.dash==='none' ? null : col, fo = fillOf(a,col), fill = fo.fill;
+    if(stroke || fill) out.push({k:'path', ops, stroke, fill, op:fo.op, width:w, dash:ds.arr, cap:ds.cap});
+    if(!(ctx && ctx.editing && ctx.editing === a.id)) b.lines.forEach((l,i) => { if(l) out.push({k:'text', x:b.x+PAD, y:b.y+PAD+i*b.lh+a.size*0.88, str:l, size:a.size, color:a.textColor||col}); });
+  }
+  if(a.type !== 'text') dimLabels(a, ctx).forEach(l => labelPrims(out, l, col));
+  return out;
+}
+
+const r2 = n => Math.round(n*100)/100;
+function opsToD(ops){ return ops.map(o => o[0] + (o.length>1 ? o.slice(1).map(r2).join(' ') : '')).join(''); }
+function escX(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function primsToSvg(ps){
+  return ps.map(p => {
+    if(p.k === 'image') return `<image href="${p.src}" x="${r2(p.x)}" y="${r2(p.y)}" width="${r2(p.w)}" height="${r2(p.h)}" preserveAspectRatio="none"/>`;
+    if(p.k === 'text') return `<text x="${r2(p.x)}" y="${r2(p.y)}"${p.bold?' font-weight="bold"':''}${p.rot?` transform="rotate(${r2(p.rot*180/Math.PI)} ${r2(p.x)} ${r2(p.y)})"`:''} font-size="${p.size}" fill="${p.color}" font-family="Helvetica, Arial, sans-serif" xml:space="preserve">${escX(p.str)}</text>`;
+    return `<path d="${opsToD(p.ops)}" fill="${p.fill||'none'}"${p.op&&p.op<1?` fill-opacity="${p.op}"`:''} stroke="${p.stroke||'none'}"${p.stroke?` stroke-width="${p.width}" stroke-linejoin="round" stroke-linecap="${p.cap?'round':'butt'}"${p.dash?` stroke-dasharray="${p.dash.map(r2).join(' ')}"`:''}`:''}/>`;
+  }).join('');
+}
+
+/* ---------- PDF-eksport ---------- */
+function hexRgb(h){ const n = parseInt(h.slice(1),16); return [(n>>16&255)/255, (n>>8&255)/255, (n&255)/255]; }
+function invert(m){ const [a,b,c,d,e,f] = m, det = a*d - b*c; return [d/det, -b/det, -c/det, a/det, (c*f - d*e)/det, (b*e - a*f)/det]; }
+
+/* layers: [{id,name}], annotsFor(pageIndex, layerId) -> annots, pageInfo(i) -> {transform, scale, unit}; mode: 'ocg' | 'flat' */
+async function buildPdf(PDFLib, bytes, opts){
+  const L = PDFLib, {PDFDocument, StandardFonts, PDFName, PDFHexString, PDFArray, PDFDict, PDFOperator} = L;
+  const pdf = await PDFDocument.load(bytes, {updateMetadata:false});
+  const ctx = pdf.context, font = await pdf.embedFont(StandardFonts.Helvetica), fontB = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const gsRef = ctx.register(ctx.obj({Type:'ExtGState', ca:0.2}));
+  const info = opts.info || (opts.info = {}); info.fields = 0; info.flattened = false; info.error = null;
+  if(opts.flattenForm && pdf.catalog.lookup(PDFName.of('AcroForm'))){
+    try{
+      const form = pdf.getForm(); info.fields = form.getFields().length;
+      if(info.fields){ try{ form.flatten(); }catch(e1){ form.flatten({updateFieldAppearances:false}); } info.flattened = true; }
+      if(info.flattened){ /* udfyld huller efter slettede felt-objekter, så xref-tabellen er ren */
+        const have = new Set(ctx.enumerateIndirectObjects().map(([r]) => r.objectNumber));
+        for(let n=1;n<=ctx.largestObjectNumber;n++) if(!have.has(n)) ctx.assign(L.PDFRef.of(n,0), L.PDFNull); }
+    }catch(e){ info.error = String(e && e.message || e); }
+  }
+  const charset = new Set(font.getCharacterSet());
+  const clean = s => Array.from(s).map(ch => charset.has(ch.codePointAt(0)) ? ch : '?').join('');
+  const prevMeasure = measureFn; measureFn = (s, size, bold) => (bold ? fontB : font).widthOfTextAtSize(clean(String(s)), size);
+  try{
+  const ocg = {};
+  if(opts.mode === 'ocg'){
+    const refs = opts.layers.map(l => (ocg[l.id] = ctx.register(ctx.obj({Type:'OCG', Name: PDFHexString.fromText(l.name)}))));
+    let ocp = pdf.catalog.lookup(PDFName.of('OCProperties'));
+    if(ocp instanceof PDFDict){
+      let arr = ocp.lookup(PDFName.of('OCGs')); if(!(arr instanceof PDFArray)){ arr = ctx.obj([]); ocp.set(PDFName.of('OCGs'), arr); }
+      refs.forEach(r => arr.push(r));
+      let D = ocp.lookup(PDFName.of('D')); if(!(D instanceof PDFDict)){ D = ctx.obj({}); ocp.set(PDFName.of('D'), D); }
+      const order = D.lookup(PDFName.of('Order'));
+      if(order instanceof PDFArray) refs.forEach(r => order.push(r));
+      const off = D.lookup(PDFName.of('OFF'));
+      if(!(order instanceof PDFArray) && !(off instanceof PDFArray)) {/* intet at gøre */}
+    } else {
+      pdf.catalog.set(PDFName.of('OCProperties'), ctx.obj({OCGs: refs, D: {Order: refs, ON: refs}}));
+    }
+  }
+  const pages = pdf.getPages(), imgs = {};
+  for(let i=0;i<pages.length;i++) for(const l of opts.layers) for(const a of opts.annotsFor(i, l.id))
+    if((a.type==='sign'||a.type==='symbol') && a.src && !imgs[a.src]) imgs[a.src] = await pdf.embedPng(b64Bytes(a.src));
+  for(let i=0;i<pages.length;i++){
+    const groups = opts.layers.map(l => ({l, as: opts.annotsFor(i, l.id)})).filter(g => g.as.length);
+    if(!groups.length) continue;
+    const pg = pages[i], node = pg.node; node.normalize();
+    const info = opts.pageInfo(i);
+    const fontKey = node.newFontDictionary('BladrHelv', font.ref), fontKeyB = node.newFontDictionary('BladrHelvB', fontB.ref), gsKey = node.newExtGState('BladrGS', gsRef);
+    const start = ctx.register(ctx.contentStream([L.pushGraphicsState()])), end = ctx.register(ctx.contentStream([L.popGraphicsState()]));
+    node.wrapContentStreams(start, end);
+    const ops = [L.pushGraphicsState(), L.concatTransformationMatrix(...invert(info.transform)), L.setLineJoin(L.LineJoinStyle.Round)];
+    groups.forEach((g, gi) => {
+      if(ocg[g.l.id]){
+        const res = node.Resources(); let props = res.lookup(PDFName.of('Properties'));
+        if(!(props instanceof PDFDict)){ props = ctx.obj({}); res.set(PDFName.of('Properties'), props); }
+        const key = 'BladrOC' + gi; props.set(PDFName.of(key), ocg[g.l.id]);
+        ops.push(PDFOperator.of('BDC', [PDFName.of('OC'), PDFName.of(key)]));
+      }
+      g.as.forEach(a => prims(a, info).forEach(p => {
+        if(p.k === 'image'){
+          const nm = node.newXObject('BladrImg', imgs[p.src].ref);
+          ops.push(L.pushGraphicsState(), L.concatTransformationMatrix(p.w,0,0,-p.h,p.x,p.y+p.h), L.drawObject(nm), L.popGraphicsState());
+          return;
+        }
+        if(p.k === 'text'){
+          ops.push(L.pushGraphicsState(), L.setFillingRgbColor(...hexRgb(p.color)), L.beginText(), L.setFontAndSize(p.bold ? fontKeyB : fontKey, p.size),
+            L.setTextMatrix(Math.cos(p.rot||0),Math.sin(p.rot||0),Math.sin(p.rot||0),-Math.cos(p.rot||0),p.x,p.y), L.showText((p.bold ? fontB : font).encodeText(clean(p.str))), L.endText(), L.popGraphicsState());
+          return;
+        }
+        ops.push(L.pushGraphicsState());
+        if(p.stroke){ ops.push(L.setStrokingRgbColor(...hexRgb(p.stroke)), L.setLineWidth(p.width), L.setLineCap(p.cap ? L.LineCapStyle.Round : L.LineCapStyle.Butt), L.setDashPattern(p.dash || [], 0)); }
+        if(p.fill) ops.push(L.setFillingRgbColor(...hexRgb(p.fill)));
+        if(p.fill && p.op && p.op < 1) ops.push(L.setGraphicsState(gsKey));
+        p.ops.forEach(o => {
+          if(o[0]==='M') ops.push(L.moveTo(o[1],o[2])); else if(o[0]==='L') ops.push(L.lineTo(o[1],o[2]));
+          else if(o[0]==='C') ops.push(L.appendBezierCurve(o[1],o[2],o[3],o[4],o[5],o[6])); else ops.push(L.closePath());
+        });
+        ops.push(p.fill && p.stroke ? L.fillAndStroke() : p.fill ? L.fill() : L.stroke());
+        ops.push(L.popGraphicsState());
+      }));
+      if(ocg[g.l.id]) ops.push(PDFOperator.of('EMC', []));
+    });
+    ops.push(L.popGraphicsState());
+    pg.pushOperators(...ops);
+  }
+  return await pdf.save();
+  } finally { measureFn = prevMeasure; }
+}
+
+/* Låst billedkopi: hver side renderes til et billede og lægges i en ny PDF */
+async function rasterizePdf(pdfjsLib, PDFLib, bytes, o){
+  o = o || {}; const dpi = o.dpi || 200, maxPx = o.maxPx || 7000;
+  const src = await pdfjsLib.getDocument({data: bytes}).promise, out = await PDFLib.PDFDocument.create();
+  try{
+    for(let i=1;i<=src.numPages;i++){
+      if(o.onProgress) o.onProgress(i, src.numPages);
+      const pg = await src.getPage(i), v1 = pg.getViewport({scale:1});
+      const sc = Math.min(dpi/72, maxPx/Math.max(v1.width, v1.height)), vp = pg.getViewport({scale:sc});
+      const cv = document.createElement('canvas'); cv.width = Math.ceil(vp.width); cv.height = Math.ceil(vp.height);
+      const cx = cv.getContext('2d'); cx.fillStyle = '#ffffff'; cx.fillRect(0,0,cv.width,cv.height);
+      await pg.render({canvasContext:cx, viewport:vp, annotationMode:(pdfjsLib.AnnotationMode ? pdfjsLib.AnnotationMode.ENABLE : 1)}).promise;
+      const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', o.quality || 0.88));
+      const img = await out.embedJpg(new Uint8Array(await blob.arrayBuffer()));
+      out.addPage([v1.width, v1.height]).drawImage(img, {x:0, y:0, width:v1.width, height:v1.height});
+      cv.width = cv.height = 0; pg.cleanup();
+    }
+  } finally { await src.destroy(); }
+  return out.save();
+}
+
+return {polyLen, polyArea, fmtArea, stampBox, markerOps, rasterizePdf, dimLabels, setMeasure, fmtLen, prims, primsToSvg, textBox, bbox, buildPdf, PT_MM, FILLS, rectOps, circleOps, opsToD};
+})();
+
+
+</script>
+<script>
+(() => {
+const pdfjsLib = window['pdfjs-dist/build/pdf'];
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
+const C = BladrCore;
+const SAMPLE = 'JVBERi0xLjQKJZOMi54gUmVwb3J0TGFiIEdlbmVyYXRlZCBQREYgZG9jdW1lbnQgKG9wZW5zb3VyY2UpCjEgMCBvYmoKPDwKL0YxIDIgMCBSIC9GMiAzIDAgUgo+PgplbmRvYmoKMiAwIG9iago8PAovQmFzZUZvbnQgL0hlbHZldGljYSAvRW5jb2RpbmcgL1dpbkFuc2lFbmNvZGluZyAvTmFtZSAvRjEgL1N1YnR5cGUgL1R5cGUxIC9UeXBlIC9Gb250Cj4+CmVuZG9iagozIDAgb2JqCjw8Ci9CYXNlRm9udCAvSGVsdmV0aWNhLUJvbGQgL0VuY29kaW5nIC9XaW5BbnNpRW5jb2RpbmcgL05hbWUgL0YyIC9TdWJ0eXBlIC9UeXBlMSAvVHlwZSAvRm9udAo+PgplbmRvYmoKNCAwIG9iago8PAovQ29udGVudHMgOSAwIFIgL01lZGlhQm94IFsgMCAwIDU5NS4yNzU2IDg0MS44ODk4IF0gL1BhcmVudCA4IDAgUiAvUmVzb3VyY2VzIDw8Ci9Gb250IDEgMCBSIC9Qcm9jU2V0IFsgL1BERiAvVGV4dCAvSW1hZ2VCIC9JbWFnZUMgL0ltYWdlSSBdCj4+IC9Sb3RhdGUgMCAvVHJhbnMgPDwKCj4+IAogIC9UeXBlIC9QYWdlCj4+CmVuZG9iago1IDAgb2JqCjw8Ci9Db250ZW50cyAxMCAwIFIgL01lZGlhQm94IFsgMCAwIDU5NS4yNzU2IDg0MS44ODk4IF0gL1BhcmVudCA4IDAgUiAvUmVzb3VyY2VzIDw8Ci9Gb250IDEgMCBSIC9Qcm9jU2V0IFsgL1BERiAvVGV4dCAvSW1hZ2VCIC9JbWFnZUMgL0ltYWdlSSBdCj4+IC9Sb3RhdGUgMCAvVHJhbnMgPDwKCj4+IAogIC9UeXBlIC9QYWdlCj4+CmVuZG9iago2IDAgb2JqCjw8Ci9QYWdlTW9kZSAvVXNlTm9uZSAvUGFnZXMgOCAwIFIgL1R5cGUgL0NhdGFsb2cKPj4KZW5kb2JqCjcgMCBvYmoKPDwKL0F1dGhvciAoYW5vbnltb3VzKSAvQ3JlYXRpb25EYXRlIChEOjIwMjYxMDMwMTU1NjE0KzAxJzAwJykgL0NyZWF0b3IgKGFub255bW91cykgL0tleXdvcmRzICgpIC9Nb2REYXRlIChEOjIwMjYxMDMwMTU1NjE0KzAxJzAwJykgL1Byb2R1Y2VyIChSZXBvcnRMYWIgUERGIExpYnJhcnkgLSBcKG9wZW5zb3VyY2VcKSkgCiAgL1N1YmplY3QgKHVuc3BlY2lmaWVkKSAvVGl0bGUgKHVudGl0bGVkKSAvVHJhcHBlZCAvRmFsc2UKPj4KZW5kb2JqCjggMCBvYmoKPDwKL0NvdW50IDIgL0tpZHMgWyA0IDAgUiA1IDAgUiBdIC9UeXBlIC9QYWdlcwo+PgplbmRvYmoKOSAwIG9iago8PAovRmlsdGVyIFsgL0FTQ0lJODVEZWNvZGUgL0ZsYXRlRGVjb2RlIF0gL0xlbmd0aCA3NzEKPj4Kc3RyZWFtCkdhdD1oYyJjI2YnU1o7USdQSCNVOWNfRWNyM0hpKFRGYV9nVk1kMks6Tl5NKVE9VjpUZ3QrNC1HUzYyUUJFczBwT2dzUjlrP2B1ZzdMVSdoXklJLmlgbSJTZjkyTioqPWQ1Vi9gLW89Vz1NZjtoK1xINk5RM2o6RTxJJWlkRj8+SSEiX1VcODxbRSIwVVNRZy5XWWdLOz9MOFUtQSVHcW9TS1ElJWwoajlcW0llPUxsOC5vSDdAQl9zZUtbOVcrPmxqUTgvYjVRZ288aTI6VDBtXz9fKlFiKDcjXkJrRDM1SGsiNSo7YFA+VG9LOT5kaFtAIlktaDJ1YV0xKj9mPy88KUc3MGIpMGNbKEQoS1ZcdDdMQFZAU0xUakssaylAYSlNWmVVXWVOQ0I6ZTlYSStgPSxxW29IQ3I0VFRIVSpYOm89VXFHN1BlOj9tTDpoMnRLXV0rNGEvOCQpQTdRMzkqUjdacjMlNiJLO1BNKDksOThnZzxrYT1ELmlcaGE/REItNXQyQyRLSWY/NjNkQyErXzVlUmY2JCdHQD4udWNvSkknZU5aYyNiKjZlJzBQKThbLjQqJVIkImtiUjxqSTlQQyRmYmlIZ05IcWpYPy9OMUJINSxcOWdiXEcjOWc1Nk46TFFscjpgSmoiSEFLYGt0Pl03WzdVNWJGZSY8JypRVlhSOjVcdW9lX2s6OzYhZiJTJSgnQGIoRDtrbyhHWktgT28+PEdvM3ViWl4sOmk4KUNIblxNNT4jdWt0KkBGTkhMckIkWWVvOEBIdTUuZGlzNiEiP1hdVU9VOTtjJDhBR2NlUzs6YEVKJl8vQjdESi5uZ3VCT05gbz5APl9NUyk9JWhBMzdPdG45Z00hZiRGJUVsPk0/OyFqX286OlVgTGtVOUw0ZkJWNDhzOTZUJTFmKD1ga2QnRENjOVBLVjNJaS1oVWRZPD1rMHRLWzcsSFBTTzBJNylXNWpCQkw0UV9qJixrazVOVy0jNC5QZF5oS1NdUk1PIjcnWT9UdUgoRmF+PmVuZHN0cmVhbQplbmRvYmoKMTAgMCBvYmoKPDwKL0ZpbHRlciBbIC9BU0NJSTg1RGVjb2RlIC9GbGF0ZURlY29kZSBdIC9MZW5ndGggNTg5Cj4+CnN0cmVhbQpHYXQ9aF8vJWRaKHJidD4vKUlDNCQoPSVcUDMhX2glPFBGVFo5dT1tUClDLiJTZWtOOlo0YmY+NU85YCFcI3NmVUsrQ0dhaGc9aEBCKiY7QzolKGRlWEBnLyY1VGtXYCFEK1Y4SV9uZ2k/bUo7LSFcRUJTKF1idF9kK2ZiUCRQLzgmJk1wOjw6a2BAJjx1TTY0WnRNJy5LXmpvZEBaaEs8RWcuPm9SQTlEUzRScmY5LDwrOy47VkMqVGMkJD5pY0ZQTyVjNC5QZGknWE5tPkVoP0w/OVsiJmc3XiY2OHFFKl8+MyVJWjlmVVFTaSxnXWs/JGonK1VpJ2dxO11pcy1VbSZLZlVQZ0xqcXFzQmAzRW1Oc1RdQiFbcWVaUz5MIUJdMyMoPEhFY0dtbiNra3I5OkFFMlM+Zi8oS05MOl9SVFEwV2hwPmotWkhjb2FkVFNTcGVxcF8jSj0sayxyNWdMMTMsUTVcQCZrTTZcU1ErR24vNTFEcyJJI1tsXiotXCQpb11LPzdvWlZuSD4yW0JESmlfNXBYKihGSTRXLkFUSU4yZU9xSyIvZUM2biRtcCJkMmtTYFA3QVsyWG1UPDQxP19UNDJjYjdbazY0STs7IUdrMFVOZSU1dE01XENwNExnbEtNbFtSaUEkYDdjUEMkcmFWT0JMNStQWWAlUDBLPmZPOFtFW1FIYSVFSzYjSkhNT3IiNEFSKkFFbkIkT05bWWZDSDsoMUtUYj5aLk8zT21YKzlLQm9rXGA+Nm4xO2AhaE9CRF41aT4pWn4+ZW5kc3RyZWFtCmVuZG9iagp4cmVmCjAgMTEKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDYxIDAwMDAwIG4gCjAwMDAwMDAxMDIgMDAwMDAgbiAKMDAwMDAwMDIwOSAwMDAwMCBuIAowMDAwMDAwMzIxIDAwMDAwIG4gCjAwMDAwMDA1MjQgMDAwMDAgbiAKMDAwMDAwMDcyOCAwMDAwMCBuIAowMDAwMDAwNzk2IDAwMDAwIG4gCjAwMDAwMDEwNTcgMDAwMDAgbiAKMDAwMDAwMTEyMiAwMDAwMCBuIAowMDAwMDAxOTgzIDAwMDAwIG4gCnRyYWlsZXIKPDwKL0lEIApbPDg4ZDA0OWUxODJiN2QxODkxNjg2NDhmMGQ1MWMwMTBjPjw4OGQwNDllMTgyYjdkMTg5MTY4NjQ4ZjBkNTFjMDEwYz5dCiUgUmVwb3J0TGFiIGdlbmVyYXRlZCBQREYgZG9jdW1lbnQgLS0gZGlnZXN0IChvcGVuc291cmNlKQoKL0luZm8gNyAwIFIKL1Jvb3QgNiAwIFIKL1NpemUgMTEKPj4Kc3RhcnR4cmVmCjI2NjMKJSVFT0YK';
+const $ = id => document.getElementById(id);
+const app = $('app'), viewer = $('viewer');
+const mctx = document.createElement('canvas').getContext('2d');
+C.setMeasure((s, size) => { mctx.font = size + 'px Helvetica, Arial, sans-serif'; return mctx.measureText(s).width; });
+
+let doc=null, docKey='', docName='', origBytes=null, encrypted=false, pages=[], sizes=[], base=null, scale=1, fit='width', rot=0, cur=1;
+let pageTexts=null, query='', loadingTask=null, gen=0;
+let S = freshState();            // markeringer for det åbne dokument
+let tool='select', selId=null, editingId=null, drag=null, undoStack=[], redoStack=[];
+const COLORS = ['#e03131','#1c7ed6','#2f9e44','#f08c00','#c2255c','#212529'];
+const defaults = {
+  line:{color:'#e03131',width:1.5,dash:'solid',arrowStart:false,arrowEnd:false,showDim:false,size:10},
+  arrow:{color:'#e03131',width:1.5,dash:'solid',arrowStart:false,arrowEnd:true,showDim:false,size:10},
+  rect:{color:'#e03131',width:1.5,dash:'cloud',fill:'none',showDim:false,size:10},
+  circle:{color:'#e03131',width:1.5,dash:'solid',fill:'none',showDim:false,dimKind:'d',size:10},
+  text:{color:'#e03131',width:1,dash:'solid',fill:'white',size:12},
+  callout:{color:'#e03131',width:1,dash:'solid',fill:'white',size:12},
+  measure:{color:'#1c7ed6',width:1,size:10,ends:'tick'},
+  poly:{color:'#1c7ed6',width:1.5,dash:'solid',showDim:false,size:10},
+  area:{color:'#2f9e44',width:1,dash:'solid',fill:'tint',size:10},
+  count:{size:9},
+  stamp:{label:'GODKENDT',color:'#2f9e44',size:14,showName:true,showDate:true},
+};
+function unitDefaults(){let d={};try{d=JSON.parse(localStorage.getItem('bladr:defaults')||'{}')||{}}catch{}return {unit:d.unit||'m',paperUnit:d.paperUnit||'mm',dec:d.dec||'auto'}}
+function freshState(){ const d=unitDefaults(); return {layers:[{id:'l1',name:'Lag 1',visible:true}], active:'l1', annots:[], scales:{all:null,pages:{}}, unit:d.unit, paperUnit:d.paperUnit, dec:d.dec, inMode:'real', countGroups:[], activeCount:null, kitLayers:{}}; }
+const NAMES={symbol:'Symbol',poly:'Polylinje',area:'Areal',count:'Tæl',stamp:'Stempel',sign:'Underskrift',select:'Vælg',line:'Streg',arrow:'Pil',rect:'Ramme',circle:'Cirkel',text:'Tekstfelt',callout:'Tekst med pil',measure:'Måling',calibrate:'Kalibrering'};
+function kindOf(a){ if(a.type==='line')return (a.arrowEnd||a.arrowStart)?'arrow':'line'; if(a.type==='text')return a.leader?'callout':'text'; return a.type; }
+const uid = () => Math.random().toString(36).slice(2,9);
+
+/* ---------- hjælpere ---------- */
+const store = { get(k){try{return localStorage.getItem(k)}catch{return null}}, set(k,v){try{localStorage.setItem(k,v)}catch{}} };
+function toast(msg,ms=2800){const t=$('toast');t.textContent=msg;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>t.hidden=true,ms)}
+const fmtSize=b=>b<1048576?Math.max(1,Math.round(b/1024))+' kB':(b/1048576).toFixed(1).replace('.',',')+' MB';
+const fmtDate=t=>new Date(t).toLocaleDateString('da-DK',{day:'numeric',month:'short'});
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const num=v=>parseFloat(String(v).replace(/\s/g,'').replace(',','.'));
+const typing=e=>!!(e.target&&e.target.closest&&e.target.closest('input,textarea,select'));
+
+/* ---------- IndexedDB: filer + markeringer ---------- */
+let idb=null;
+function openDB(){return new Promise(res=>{try{const r=indexedDB.open('bladr',2);r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains('files'))d.createObjectStore('files',{keyPath:'key'});if(!d.objectStoreNames.contains('annots'))d.createObjectStore('annots',{keyPath:'key'})};r.onsuccess=()=>res(r.result);r.onerror=()=>res(null)}catch{res(null)}})}
+function tx(st,mode,fn){return new Promise(res=>{if(!idb)return res(null);try{const t=idb.transaction(st,mode);const r=fn(t.objectStore(st));t.oncomplete=()=>res(r&&r.result);t.onerror=()=>res(null)}catch{res(null)}})}
+async function listFiles(){const all=await tx('files','readonly',s=>s.getAll());return (all||[]).sort((a,b)=>b.opened-a.opened)}
+async function saveFile(rec){await tx('files','readwrite',s=>s.put(rec));const all=await listFiles();for(const x of all.slice(12))await tx('files','readwrite',s=>s.delete(x.key))}
+async function touchFile(key){const r=await tx('files','readonly',s=>s.get(key));if(r){r.opened=Date.now();await tx('files','readwrite',s=>s.put(r))}}
+let saveT;
+function persist(){clearTimeout(saveT);const key=docKey,data=JSON.parse(JSON.stringify(S));saveT=setTimeout(()=>tx('annots','readwrite',s=>s.put({key,data})),400)}
+async function renderFiles(){
+  const list=$('files'); const all=await listFiles();
+  if(!all.length){list.innerHTML='<div class="hint">Ingen gemte filer endnu. Åbn en PDF, så dukker den op her.</div>';return}
+  list.innerHTML='';
+  for(const f of all){
+    const row=document.createElement('div');row.className='file'+(f.key===docKey?' cur':'');
+    row.innerHTML=`<button class="open"><span class="fname">${esc(f.name)}</span><span class="fmeta">${fmtSize(f.size)} · ${fmtDate(f.opened)}</span></button><button class="x" title="Fjern fra listen" aria-label="Fjern ${esc(f.name)}">✕</button>`;
+    row.querySelector('.open').onclick=async()=>{openBuffer(await f.blob.arrayBuffer(),f.name,f.key);touchFile(f.key);closeSideSm()};
+    row.querySelector('.x').onclick=async()=>{await tx('files','readwrite',s=>s.delete(f.key));await tx('annots','readwrite',s=>s.delete(f.key));renderFiles()};
+    list.appendChild(row);
+  }
+}
+
+/* ---------- åbning ---------- */
+async function openFiles(fileList){
+  const pdfs=[...fileList].filter(f=>f.type==='application/pdf'||/\.pdf$/i.test(f.name));
+  if(!pdfs.length){toast('Det er ikke en PDF-fil.');return}
+  for(const f of pdfs) await saveFile({key:f.name+'|'+f.size+'|'+f.lastModified,name:f.name,size:f.size,opened:Date.now(),blob:f});
+  const f=pdfs[0];
+  openBuffer(await f.arrayBuffer(),f.name,f.name+'|'+f.size+'|'+f.lastModified);
+  if(pdfs.length>1)toast(pdfs.length+' filer tilføjet til listen');
+  renderFiles();
+}
+
+async function openBuffer(buf,name,key,seed){
+  const my=++gen;
+  finishEdit();
+  if(loadingTask){try{loadingTask.destroy()}catch{}}
+  if(doc){try{doc.destroy()}catch{}}
+  doc=null;pages=[];sizes=[];pageTexts=null;viewer.innerHTML='';$('thumbs').innerHTML='';encrypted=false;selId=null;
+  origBytes=buf.slice(0);
+  loadingTask=pdfjsLib.getDocument({data:new Uint8Array(buf)});
+  loadingTask.onPassword=(cb,reason)=>{encrypted=true;askPassword(cb,reason===2)};
+  try{ doc=await loadingTask.promise }catch(e){ if(my===gen){$('pwBox').hidden=true;toast('Filen kunne ikke åbnes. Den er måske beskadiget.')} return }
+  if(my!==gen)return;
+  $('pwBox').hidden=true;
+  docKey=key; docName=name; rot=0;
+  $('docName').textContent=name; $('docName').title=name;
+  document.title=name+' · Bladr';
+  const all=await Promise.all(Array.from({length:doc.numPages},(_,i)=>doc.getPage(i+1)));
+  if(my!==gen)return;
+  sizes=all.map(p=>{const v=p.getViewport({scale:1});return {w:v.width,h:v.height,t:v.transform,rotate:p.rotate}});
+  base=sizes[0];
+  const saved=await tx('annots','readonly',s=>s.get(key));
+  S = saved&&saved.data ? Object.assign(freshState(),saved.data) : (seed||freshState());
+  if(!S.layers.length) S.layers=freshState().layers;
+  if(!S.layers.some(l=>l.id===S.active)) S.active=S.layers[0].id;
+  undoStack=[];redoStack=[];updUndo();
+  $('pageCount').textContent='/ '+doc.numPages;
+  buildPages(); buildThumbs(); renderLayers(); updProps(); updScaleBtn();
+  const savedPage=parseInt(store.get('bladr:page:'+key)||'1',10);
+  requestAnimationFrame(()=>goTo(savedPage>1&&savedPage<=doc.numPages?savedPage:1,false));
+  renderFiles();
+  if(query)runSearch();
+}
+
+function askPassword(cb,wrong){
+  $('pwBox').hidden=false; $('pwMsg').textContent=wrong?'Forkert adgangskode. Prøv igen.':'Indtast adgangskoden for at åbne filen.';
+  $('pwIn').value='';setTimeout(()=>$('pwIn').focus(),30);
+  $('pwForm').onsubmit=e=>{e.preventDefault();cb($('pwIn').value)};
+  $('pwCancel').onclick=()=>{$('pwBox').hidden=true;if(loadingTask)loadingTask.destroy();viewer.innerHTML='';$('docName').textContent='Intet dokument'};
+}
+
+/* ---------- sider ---------- */
+const io=new IntersectionObserver(ents=>{for(const e of ents){const p=pages[+e.target.dataset.i];if(!p)continue;if(e.isIntersecting&&!p.rendered)renderPage(p)}},{root:viewer,rootMargin:'600px 0px'});
+const SVGNS='http://www.w3.org/2000/svg';
+function computeScale(){
+  if(!base)return 1;
+  const r=rot%180?{w:base.h,h:base.w}:{w:base.w,h:base.h};
+  const cw=viewer.clientWidth-40, ch=viewer.clientHeight-44;
+  if(fit==='width')return Math.max(.25,Math.min(6,cw/r.w));
+  if(fit==='page')return Math.max(.25,Math.min(6,Math.min(cw/r.w,ch/r.h)));
+  return scale;
+}
+function buildPages(){
+  io.disconnect(); viewer.innerHTML=''; pages=[];
+  for(let i=1;i<=doc.numPages;i++){
+    const el=document.createElement('div');el.className='page';el.dataset.i=i-1;
+    el.innerHTML=`<span class="num">${i}</span>`;
+    const svg=document.createElementNS(SVGNS,'svg');svg.setAttribute('class','ann');
+    const g=document.createElementNS(SVGNS,'g');svg.appendChild(g);el.appendChild(svg);
+    viewer.appendChild(el);
+    const p={n:i,el,svg,g,rendered:false,task:null};
+    svg.addEventListener('pointerdown',e=>onDown(p,e));
+    svg.addEventListener('dblclick',e=>onDbl(p,e));
+    pages.push(p);
+  }
+  applyToolClass();
+  layout();
+}
+function gMatrix(p){
+  const s=scale,{w,h}=sizes[p.n-1];
+  return rot===0?[s,0,0,s,0,0]:rot===90?[0,s,-s,0,h*s,0]:rot===180?[-s,0,0,-s,w*s,h*s]:[0,-s,s,0,0,w*s];
+}
+function layout(){
+  scale=computeScale(); updateZoomUI();
+  for(const p of pages){
+    if(p.task){try{p.task.cancel()}catch{}p.task=null}
+    p.rendered=false;
+    let {w,h}=sizes[p.n-1]; if(rot%180)[w,h]=[h,w];
+    p.el.style.width=Math.floor(w*scale)+'px';p.el.style.height=Math.floor(h*scale)+'px';
+    p.el.style.setProperty('--scale-factor',scale);
+    p.g.setAttribute('transform','matrix('+gMatrix(p).join(',')+')');
+    io.unobserve(p.el);io.observe(p.el);
+  }
+  renderAllAnn();
+  if(editingId)placeEditor();
+}
+async function renderPage(p){
+  p.rendered=true; const my=gen;
+  const page=await doc.getPage(p.n); if(my!==gen)return;
+  const vp=page.getViewport({scale,rotation:(page.rotate+rot)%360});
+  const dpr=Math.min(window.devicePixelRatio||1,2.5);
+  const c=document.createElement('canvas');c.width=Math.floor(vp.width*dpr);c.height=Math.floor(vp.height*dpr);
+  const task=page.render({canvasContext:c.getContext('2d'),viewport:vp,transform:dpr!==1?[dpr,0,0,dpr,0,0]:null});
+  p.task=task;
+  try{await task.promise}catch{return}
+  if(my!==gen||p.task!==task)return; p.task=null;
+  p.el.querySelectorAll('canvas,.textLayer').forEach(n=>n.remove());
+  p.el.prepend(c);
+  const tl=document.createElement('div');tl.className='textLayer';p.el.insertBefore(tl,p.svg);
+  try{
+    const tc=await page.getTextContent();
+    await pdfjsLib.renderTextLayer({textContentSource:tc,container:tl,viewport:vp}).promise;
+    markHits(p);
+  }catch{}
+}
+function markHits(p){const q=query.toLowerCase();p.el.querySelectorAll('.textLayer span').forEach(s=>s.classList.toggle('hit',!!q&&s.textContent.toLowerCase().includes(q)))}
+
+/* ---------- markeringer: tegning ---------- */
+const layerVisible=id=>{const l=S.layers.find(l=>l.id===id);return !!l&&l.visible};
+const pageScale=n=>S.scales.pages[n]??S.scales.all??null;
+function annCtx(n){return {scale:pageScale(n-1),unit:S.unit,paperUnit:S.paperUnit,dec:S.dec,editing:editingId,groups:S.countGroups}}
+function renderAnn(p){
+  const n=p.n, s=scale, list=S.annots.filter(a=>a.page===n-1&&layerVisible(a.layer));
+  let html='';
+  for(const a of list){
+    html+=`<g data-id="${a.id}">`+C.primsToSvg(C.prims(a,annCtx(n)));
+    const hw=Math.max(10/s,(a.width||1)+4/s);
+    if(a.type==='line'||a.type==='measure') html+=`<path class="hit" d="M${a.x1} ${a.y1}L${a.x2} ${a.y2}" stroke="transparent" stroke-width="${hw}" fill="none"/>`;
+    else if(a.type==='poly'||(a.type==='area'&&(!a.fill||a.fill==='none'))){
+      html+=`<path class="hit" style="pointer-events:stroke" d="${C.opsToD(C.prims(Object.assign({},a,{dash:'solid'}),{})[0].ops)}" stroke="transparent" stroke-width="${hw}" fill="none"/>`;
+    }
+    else if(a.type==='area'){ html+=`<path class="hit" d="${C.opsToD(C.prims(a,{})[0].ops)}" fill="transparent" stroke="transparent" stroke-width="${hw}"/>`; }
+    else if((a.type==='rect'||a.type==='circle')&&(!a.fill||a.fill==='none')){
+      const d=C.opsToD(a.type==='rect'?C.rectOps(a.x,a.y,a.w,a.h):C.circleOps(a.cx,a.cy,a.r));
+      html+=`<path class="hit" style="pointer-events:stroke" d="${d}" stroke="transparent" stroke-width="${hw+(a.dash==='cloud'?(10+2*(a.width||1))/2:0)}" fill="none"/>`;
+    }
+    else { const b=C.bbox(a); html+=`<rect class="hit" x="${b.x-3/s}" y="${b.y-3/s}" width="${b.w+6/s}" height="${b.h+6/s}" fill="transparent"/>`;
+      if(a.type==='text'&&a.leader) html+=`<path class="hit" d="M${b.x+b.w/2} ${b.y+b.h/2}L${a.leader.x} ${a.leader.y}" stroke="transparent" stroke-width="${hw}" fill="none"/>`; }
+    C.dimLabels(a,annCtx(n)).forEach(l=>{html+=`<rect class="hit lab" data-lab="${l.key}" x="${l.x-l.w/2}" y="${l.y-l.h/2}" width="${l.w}" height="${l.h}" fill="transparent"${l.rot?` transform="rotate(${l.rot*180/Math.PI} ${l.x} ${l.y})"`:''}/>`});
+    html+='</g>';
+  }
+  const sel=selId&&list.find(a=>a.id===selId);
+  if(sel){
+    const b=C.bbox(sel),pd=4/s,hs=9/s,sw=1.2/s;
+    html+=`<rect x="${b.x-pd}" y="${b.y-pd}" width="${b.w+2*pd}" height="${b.h+2*pd}" fill="none" stroke="#1f5f8b" stroke-width="${sw}" stroke-dasharray="${4/s} ${3/s}"/>`;
+    handlesOf(sel).forEach(h=>{html+=`<rect class="hd" data-h="${h.k}" x="${h.x-hs/2}" y="${h.y-hs/2}" width="${hs}" height="${hs}" fill="#ffffff" stroke="#1f5f8b" stroke-width="${sw*1.3}"/>`});
+  }
+  if(drag&&drag.preview&&drag.p===p) html+=drag.preview;
+  html+=ghostSvg(p)+polyPreview(p);
+  p.g.innerHTML=html;
+}
+function renderAllAnn(){pages.forEach(renderAnn)}
+function handlesOf(a){
+  if(a.type==='line'||a.type==='measure')return [{k:'1',x:a.x1,y:a.y1},{k:'2',x:a.x2,y:a.y2}];
+  if(a.type==='rect')return [{k:'tl',x:a.x,y:a.y},{k:'tr',x:a.x+a.w,y:a.y},{k:'bl',x:a.x,y:a.y+a.h},{k:'br',x:a.x+a.w,y:a.y+a.h}];
+  if(a.type==='circle')return [{k:'r',x:a.cx+a.r,y:a.cy}];
+  if(a.type==='sign'||a.type==='symbol')return [{k:'sz',x:a.x+a.w,y:a.y+a.h}];
+  if(a.type==='stamp'){const b=C.stampBox(a);return [{k:'st',x:b.x+b.w,y:b.y+b.h}]}
+  if(a.pts){const h=[];for(let i=0;i<a.pts.length;i+=2)h.push({k:'v'+(i/2),x:a.pts[i],y:a.pts[i+1]});return h}
+  if(a.type==='text'&&a.leader)return [{k:'tip',x:a.leader.x,y:a.leader.y}];
+  return [];
+}
+
+/* ---------- historik ---------- */
+function snap(){return JSON.stringify(S)}
+function pushHist(){undoStack.push(snap());if(undoStack.length>150)undoStack.shift();redoStack=[];updUndo()}
+function restore(js){Object.assign(S,JSON.parse(js));if(selId&&!S.annots.some(a=>a.id===selId))selId=null;commit(false)}
+function undo(){if(!undoStack.length)return;finishEdit();redoStack.push(snap());restore(undoStack.pop());updUndo()}
+function redo(){if(!redoStack.length)return;undoStack.push(snap());restore(redoStack.pop());updUndo()}
+function updUndo(){$('btnUndo').disabled=!undoStack.length;$('btnRedo').disabled=!redoStack.length}
+function commit(){persist();renderAllAnn();renderLayers();updProps();updScaleBtn();renderList()}
+
+/* ---------- værktøjer ---------- */
+const HINTS={symbol:'Klik på tegningen for at sætte symbolet ind. Bliv ved med at klikke for flere. Esc afslutter.',poly:'Klik for hvert knæk. Dobbeltklik eller Enter afslutter, Backspace fjerner sidste punkt. Shift låser til 45°.',area:'Klik rundt om fladen. Klik på startpunktet, dobbeltklik eller Enter lukker den. Backspace fjerner sidste punkt.',count:'Klik på hvert element, der skal tælles. Vælg eller opret gruppen herunder.',stamp:'Vælg stempel herunder, og klik på siden, hvor det skal stå.',sign:'Klik på siden, hvor underskriften skal stå. Esc annullerer.',select:'Klik på en markering for at vælge den. Dobbeltklik for at redigere tekst og mål. Klik på papiret eller tryk Esc for at afslutte.',line:'Træk for at tegne. Shift låser til 45°.',arrow:'Træk fra start til spids. Shift låser til 45°.',rect:'Træk en ramme op.',circle:'Træk fra centrum og ud. Afstanden er radius.',text:'Klik hvor teksten skal stå. Klik på et eksisterende tekstfelt for at redigere det.',callout:'Træk fra punktet pilen skal pege på, hen til hvor teksten skal stå.',measure:'Træk mellem to punkter. Shift låser til 45°.',calibrate:'Træk mellem to punkter med kendt afstand.'};
+const SELHINT={symbol:'Træk for at flytte, og træk i hjørnet for at ændre størrelsen. Den nye størrelse huskes til næste gang.',poly:'Træk i punkterne for at justere. Slå delmål til under Udseende. Længden kan trækkes til en anden plads.',area:'Træk i punkterne for at justere. Areal og omkreds står i midten og kan trækkes.',count:'Tællepunkt. Delete fjerner det.',stamp:'Træk for at flytte, og træk i hjørnet for at ændre størrelsen. Vælg et andet stempel herunder for at skifte tekst.',sign:'Træk for at flytte. Træk i hjørnet nederst til højre for at ændre størrelsen.',text:'Dobbeltklik for at redigere teksten. Træk for at flytte.',callout:'Dobbeltklik for at redigere teksten. Træk i pilespidsen for at flytte den.',measure:'Træk i måltallet for at flytte det. Dobbeltklik for at skrive din egen tekst. Træk i endepunkterne for at justere.',line:'Træk i endepunkterne, eller skriv længde og vinkel under Mål. Måltallet kan trækkes til en anden plads.',arrow:'Træk i endepunkterne, eller skriv længde og vinkel under Mål. Måltallet kan trækkes til en anden plads.',rect:'Træk i hjørnerne, eller skriv bredde og højde under Mål. Måltallet kan trækkes til en anden plads.',circle:'Træk i håndtaget for at ændre størrelsen, eller skriv målet under Mål. Måltallet kan trækkes til en anden plads.'};
+function setTool(t){
+  if(polyDraw&&t!==tool)cancelPoly();
+  if(t!=='symbol')pendingSym=null;
+  if(!kitApplying)activeKit=null;
+  if(t!=='sign'){pendingSig=null;if(ghost){const gp=ghost.p;ghost=null;renderAnn(gp)}}
+  finishEdit(); tool=t; if(t!=='select'){selId=null;renderAllAnn()}
+  document.querySelectorAll('.tool').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tool===t));
+  applyToolClass(); updProps();
+  if(DRAWKINDS.includes(t))autoPanel();
+}
+function applyToolClass(){viewer.classList.toggle('draw',tool!=='select')}
+document.querySelectorAll('.tool').forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
+
+function evtPt(p,e){const m=p.g.getScreenCTM();if(!m)return {x:0,y:0};const q=new DOMPoint(e.clientX,e.clientY).matrixTransform(m.inverse());return {x:q.x,y:q.y}}
+function snap45(a,b,e){if(!e.shiftKey)return b;const dx=b.x-a.x,dy=b.y-a.y,ang=Math.round(Math.atan2(dy,dx)/(Math.PI/4))*(Math.PI/4),d=Math.hypot(dx,dy);return {x:a.x+Math.cos(ang)*d,y:a.y+Math.sin(ang)*d}}
+function ensureActiveVisible(){const l=S.layers.find(l=>l.id===S.active);if(l&&!l.visible){l.visible=true;toast('Laget "'+l.name+'" er gjort synligt')}}
+
+function onDown(p,e){
+  if(e.button>0)return;
+  const ae=document.activeElement; if(ae&&ae.closest&&ae.closest('#paneTool'))ae.blur();
+  if(editingId){finishEdit();if(tool==='select')return}
+  const pt=evtPt(p,e);
+  if(tool==='select'){
+    const hEl=e.target.closest('[data-h]'), gEl=e.target.closest('[data-id]');
+    if(hEl&&selId){const a=S.annots.find(x=>x.id===selId);e.preventDefault();p.svg.setPointerCapture(e.pointerId);
+      drag={mode:'handle',p,k:hEl.dataset.h,a,orig:JSON.parse(JSON.stringify(a)),start:pt,moved:false};return}
+    if(gEl){const a=S.annots.find(x=>x.id===gEl.dataset.id);if(!a)return;e.preventDefault();
+      const now=performance.now();
+      if(lastTap.id===a.id&&now-lastTap.t<450){lastTap.id=null;editRequest(a);return}
+      lastTap={id:a.id,t:now};
+      const labEl=e.target.closest('[data-lab]');
+      selId=a.id;renderAllAnn();updProps();autoPanel();
+      p.svg.setPointerCapture(e.pointerId);drag={mode:labEl?'label':'move',key:labEl&&labEl.dataset.lab,p,a,orig:JSON.parse(JSON.stringify(a)),start:pt,moved:false};return}
+    lastTap.id=null;
+    return;
+  }
+  e.preventDefault(); p.svg.setPointerCapture(e.pointerId);
+  if(tool==='sign'){if(pendingSig){placeSig(p,pt);drag={mode:'noop',p}}return}
+  if(tool==='poly'||tool==='area'){polyClick(p,pt,e);drag={mode:'noop',p};return}
+  if(tool==='count'){placeCount(p,pt);drag={mode:'noop',p};return}
+  if(tool==='symbol'){if(pendingSym)placeSymbol(p,pt);drag={mode:'noop',p};return}
+  if(tool==='stamp'){if(selId){goHome();return}ensureActiveVisible();addAnnot(makeStamp(pt.x,pt.y),p.n-1,true);ghost=null;drag={mode:'noop',p};return}
+  if(tool==='text'){
+    const hitT=S.annots.find(a=>a.type==='text'&&a.page===p.n-1&&layerVisible(a.layer)&&(b=>pt.x>=b.x&&pt.x<=b.x+b.w&&pt.y>=b.y&&pt.y<=b.y+b.h)(C.textBox(a)));
+    if(hitT){pushHist();startEdit(hitT.id,false);return}
+    if(selId){goHome();return}
+    ensureActiveVisible();pushHist();const d=defaults.text;
+    const a={id:uid(),layer:S.active,page:p.n-1,type:'text',x:pt.x,y:pt.y-d.size*0.7,text:'',size:d.size,color:d.color,width:d.width,dash:d.dash,fill:d.fill};
+    S.annots.push(meta(a));selId=a.id;startEdit(a.id,true);return}
+  drag={mode:'draw',p,start:pt,cur:pt,hadSel:!!selId};
+}
+addEventListener('pointermove',e=>{
+  if(!drag){
+    const pe=e.target.closest&&e.target.closest('.page'),pp=pe&&pages[+pe.dataset.i];
+    if((tool==='sign'&&pendingSig)||(tool==='stamp'&&!selId)||(tool==='symbol'&&pendingSym)){const old=ghost&&ghost.p;
+      ghost=pp?{p:pp,pt:evtPt(pp,e)}:null; if(old&&old!==pp)renderAnn(old); if(pp)renderAnn(pp)}
+    if(polyDraw&&pp===polyDraw.p&&polyDraw.pts.length){polyDraw.hover=snap45(lastPt(),evtPt(pp,e),e);renderAnn(pp)}
+    return;
+  }
+  if(drag.mode==='noop')return;
+  const p=drag.p, pt=evtPt(p,e);
+  if(drag.mode==='draw'){drag.cur=(tool==='rect'||tool==='callout'||tool==='circle')?pt:snap45(drag.start,pt,e);drag.preview=previewSvg();renderAnn(p);return}
+  const dx=pt.x-drag.start.x, dy=pt.y-drag.start.y;
+  if(!drag.moved&&Math.hypot(dx,dy)*scale<2)return;
+  if(!drag.moved){pushHist();drag.moved=true}
+  const a=drag.a,o=drag.orig;
+  if(drag.mode==='label'){const k=drag.key,b=o[k]||{x:0,y:0};a[k]={x:b.x+dx,y:b.y+dy}}
+  else if(drag.mode==='move'){
+    if(a.type==='line'||a.type==='measure'){a.x1=o.x1+dx;a.y1=o.y1+dy;a.x2=o.x2+dx;a.y2=o.y2+dy}
+    else if(a.type==='circle'){a.cx=o.cx+dx;a.cy=o.cy+dy}
+    else if(o.pts){a.pts=o.pts.map((v,i)=>v+(i%2?dy:dx))}
+    else {a.x=o.x+dx;a.y=o.y+dy;if(o.leader&&e.altKey){a.leader={x:o.leader.x+dx,y:o.leader.y+dy}}}
+  } else {
+    const k=drag.k;
+    if(k==='r'){a.r=Math.max(2,Math.hypot(pt.x-a.cx,pt.y-a.cy))}
+    else if(k==='sz'){const r=o.w/o.h;a.w=Math.max(12,pt.x-a.x);a.h=a.w/r}
+    else if(k==='st'){const b=C.stampBox(o);a.size=Math.max(5,Math.min(80,o.size*Math.max(10,pt.x-o.x)/b.w))}
+    else if(k[0]==='v'){const i=+k.slice(1);a.pts[2*i]=pt.x;a.pts[2*i+1]=pt.y}
+    else if(k==='1'){const q=snap45({x:o.x2,y:o.y2},pt,e);a.x1=q.x;a.y1=q.y}
+    else if(k==='2'){const q=snap45({x:o.x1,y:o.y1},pt,e);a.x2=q.x;a.y2=q.y}
+    else if(k==='tip'){a.leader={x:pt.x,y:pt.y}}
+    else { let x1=o.x,y1=o.y,x2=o.x+o.w,y2=o.y+o.h;
+      if(k.includes('l'))x1=pt.x; if(k.includes('r'))x2=pt.x; if(k.includes('t'))y1=pt.y; if(k.includes('b'))y2=pt.y;
+      a.x=Math.min(x1,x2);a.y=Math.min(y1,y2);a.w=Math.max(4,Math.abs(x2-x1));a.h=Math.max(4,Math.abs(y2-y1)); }
+  }
+  renderAnn(p); updGeo();
+});
+addEventListener('pointerup',e=>{
+  if(!drag)return; const d=drag; drag=null;
+  if(d.mode!=='draw'){if(d.moved){if(d.mode==='handle')rememberSymSize(d.a);commit()}else renderAnn(d.p);return}
+  const a0=d.start,a1=d.cur,len=Math.hypot(a1.x-a0.x,a1.y-a0.y), pi=d.p.n-1;
+  renderAnn(d.p);
+  if(d.hadSel&&tool!=='calibrate'&&len*scale<4){goHome();return}
+  if(tool==='calibrate'){
+    if(len*scale<6){toast('Træk mellem to punkter.');return}
+    calib={pt:len,page:pi}; setTool('select'); openScale(true); return;
+  }
+  if(tool==='callout'){
+    ensureActiveVisible();pushHist();const df=defaults.callout;
+    let tx=a1.x,ty=a1.y; if(len*scale<8){tx=a0.x+40;ty=a0.y-40}
+    const a={id:uid(),layer:S.active,page:pi,type:'text',x:tx,y:ty-df.size*0.7,text:'',size:df.size,color:df.color,width:df.width,dash:df.dash,fill:df.fill,leader:{x:a0.x,y:a0.y}};
+    if(tx<a0.x){a.x=tx-60}
+    S.annots.push(meta(a));selId=a.id;startEdit(a.id,true);return;
+  }
+  if(tool==='rect'){
+    if(Math.abs(a1.x-a0.x)*scale<4||Math.abs(a1.y-a0.y)*scale<4)return;
+    addAnnot(Object.assign({type:'rect',x:Math.min(a0.x,a1.x),y:Math.min(a0.y,a1.y),w:Math.abs(a1.x-a0.x),h:Math.abs(a1.y-a0.y)},defaults.rect),pi,true);return;
+  }
+  if(tool==='circle'){
+    if(len*scale<3)return;
+    addAnnot(Object.assign({type:'circle',cx:a0.x,cy:a0.y,r:len},defaults.circle),pi,true);return;
+  }
+  if(len*scale<4)return;
+  if(tool==='measure'){addAnnot(Object.assign({type:'measure',x1:a0.x,y1:a0.y,x2:a1.x,y2:a1.y,label:''},defaults.measure),pi,true);
+    if(!pageScale(pi))toast('Ingen skala sat endnu. Målet vises som papirlængde. Klik på Skala for at sætte den.',4200)}
+  else addAnnot(Object.assign({type:'line',x1:a0.x,y1:a0.y,x2:a1.x,y2:a1.y},defaults[tool]),pi,true);
+});
+function addAnnot(a,pi,select){
+  ensureActiveVisible();pushHist();
+  a=JSON.parse(JSON.stringify(a));a.id=uid();a.layer=S.active;a.page=pi;
+  S.annots.push(meta(a));
+  if(select){selId=a.id}
+  commit(); return a;
+}
+function previewSvg(){
+  const {start:a0,cur:a1}=drag, pi=drag.p.n-1;
+  let a;
+  if(tool==='rect'){const df=defaults.rect;a=Object.assign({},df,{type:'rect',x:Math.min(a0.x,a1.x),y:Math.min(a0.y,a1.y),w:Math.max(1,Math.abs(a1.x-a0.x)),h:Math.max(1,Math.abs(a1.y-a0.y))})}
+  else if(tool==='circle')a=Object.assign({},defaults.circle,{type:'circle',cx:a0.x,cy:a0.y,r:Math.max(1,Math.hypot(a1.x-a0.x,a1.y-a0.y))});
+  else if(tool==='measure')a=Object.assign({type:'measure',x1:a0.x,y1:a0.y,x2:a1.x,y2:a1.y},defaults.measure);
+  else if(tool==='calibrate')a={type:'measure',x1:a0.x,y1:a0.y,x2:a1.x,y2:a1.y,color:'#f08c00',width:1,size:10};
+  else if(tool==='callout')a={type:'line',x1:a1.x,y1:a1.y,x2:a0.x,y2:a0.y,color:defaults.callout.color,width:1,dash:'solid',arrowEnd:true};
+  else a=Object.assign({type:'line',x1:a0.x,y1:a0.y,x2:a1.x,y2:a1.y},defaults[tool]);
+  return C.primsToSvg(C.prims(a,tool==='calibrate'?{scale:null}:annCtx(pi+1)));
+}
+
+/* ---------- tekstredigering ---------- */
+let editor=null, editIsNew=false, lastTap={id:null,t:0};
+function onDbl(){}
+function editRequest(a){
+  selId=a.id;
+  if(a.type==='text'){pushHist();startEdit(a.id,false);return}
+  renderAllAnn();autoPanel();
+  if(a.type==='measure'){
+    if(!a.label){pushHist();a.label=C.fmtLen(Math.hypot(a.x2-a.x1,a.y2-a.y1),annCtx(a.page+1));commit()}
+    else updProps();
+    setTimeout(()=>{$('pLabel').focus();$('pLabel').select()},20);return;
+  }
+  updProps();
+  setTimeout(()=>{if(!$('rG1').hidden){$('g1').focus();$('g1').select()}},20);
+}
+function startEdit(id,isNew){
+  finishEdit(); const a=S.annots.find(x=>x.id===id); if(!a)return;
+  editingId=id; editIsNew=isNew; selId=id;
+  editor=document.createElement('textarea');editor.className='editor';editor.value=a.text;editor.spellcheck=true;editor.setAttribute('aria-label','Tekst');
+  pages[a.page].el.appendChild(editor);
+  editor.addEventListener('input',()=>{a.text=editor.value;renderAnn(pages[a.page]);placeEditor()});
+  editor.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Escape'||(e.key==='Enter'&&(e.ctrlKey||e.metaKey))){e.preventDefault();finishEdit()}});
+  editor.addEventListener('blur',()=>setTimeout(finishEdit,0));
+  renderAnn(pages[a.page]);placeEditor();
+  setTimeout(()=>{editor&&editor.focus()},20);
+}
+function placeEditor(){
+  if(!editor)return; const a=S.annots.find(x=>x.id===editingId); if(!a)return;
+  const p=pages[a.page], b=C.textBox(a), m=gMatrix(p);
+  const pts=[[b.x,b.y],[b.x+b.w,b.y],[b.x,b.y+b.h],[b.x+b.w,b.y+b.h]].map(([x,y])=>[m[0]*x+m[2]*y+m[4],m[1]*x+m[3]*y+m[5]]);
+  const xs=pts.map(q=>q[0]),ys=pts.map(q=>q[1]);
+  const L=Math.min(...xs),T=Math.min(...ys);
+  Object.assign(editor.style,{left:L+'px',top:T+'px',width:Math.max(b.w*scale+14,90)+'px',height:(b.h*scale+2)+'px',fontSize:(a.size*scale)+'px',padding:(4*scale)+'px',color:a.color});
+}
+function finishEdit(){
+  if(!editingId)return; const id=editingId; editingId=null;
+  if(editor){editor.remove();editor=null}
+  const a=S.annots.find(x=>x.id===id);
+  if(a&&!a.text.trim()){S.annots=S.annots.filter(x=>x.id!==id);if(selId===id)selId=null;if(editIsNew){undoStack.pop();updUndo()}}
+  else if(a&&editIsNew&&tool!=='select'){/* behold værktøjet */}
+  commit();
+}
+
+/* ---------- egenskabspanel ---------- */
+COLORS.forEach(c=>{const b=document.createElement('button');b.className='sw';b.style.background=c;b.dataset.c=c;b.title='Farve';b.setAttribute('aria-label','Farve '+c);b.onclick=()=>setProp('color',c);$('pColor').appendChild(b)});
+const DRAWKINDS=['line','arrow','rect','circle','text','callout','measure','poly','area','count','stamp'];
+function propTarget(){const a=selId&&S.annots.find(x=>x.id===selId);if(a)return {a,kind:kindOf(a)};
+  if(DRAWKINDS.includes(tool))return {a:null,kind:tool};return null}
+const setVal=(id,v)=>{const el=$(id);if(document.activeElement!==el)el.value=v};
+function updProps(){
+  const t=propTarget(), show=(id,on)=>{$(id).hidden=!on};
+  $('pKind').textContent=t&&t.a?(DRAWKINDS.includes(tool)?'Netop tegnet · '+NAMES[tool]+' er aktivt':'Valgt markering'):'Værktøj';
+  $('pTitle').textContent=t?NAMES[t.kind]:(tool==='select'?'Intet valgt':NAMES[tool]||'');
+  $('hint').textContent=t&&t.a&&DRAWKINDS.includes(tool)?HINTS[tool]+' Ændringer gælder figuren, du lige har tegnet, og de næste du tegner.':t&&t.a?SELHINT[t.kind]:HINTS[tool]||'';
+  show('secStyle',!!t);
+  if(t){
+    const src=t.a||defaults[t.kind], k=t.kind, isLine=k==='line'||k==='arrow', shape=isLine||k==='rect'||k==='circle';
+    document.querySelectorAll('#pColor .sw').forEach(b=>b.setAttribute('aria-pressed',b.dataset.c===src.color));
+    setVal('pWidth',String(src.width||1));
+    const noStroke=['sign','count','stamp','symbol'].includes(k);
+    show('rColor',k!=='count'&&k!=='symbol'&&(k!=='sign'||!src.src)); show('rWidth',!noStroke);
+    show('rDash',k!=='measure'&&!noStroke); setVal('pDash',src.dash||'solid');
+    [...$('pDash').options].forEach(o=>{o.hidden=((o.value==='cloud'||o.value==='none')&&(isLine||k==='poly'))||(o.value==='cloud'&&k==='area')});
+    show('rFill',['rect','circle','text','callout','area'].includes(k)); setVal('pFill',src.fill||'none');
+    show('rArrows',isLine);
+    $('pArrS').setAttribute('aria-pressed',!!src.arrowStart);$('pArrE').setAttribute('aria-pressed',!!src.arrowEnd);
+    show('rEnds',k==='measure'); setVal('pEnds',src.ends||'tick');
+    show('rDim',shape||k==='poly'); $('pDim').checked=!!src.showDim; $('pDim').parentNode.lastChild.textContent=k==='poly'?' Vis delmål':' Vis mål'; show('pDimKind',k==='circle'); setVal('pDimKind',src.dimKind||'d');
+    show('rLabel',k==='measure'&&!!t.a); const manual=!!(t.a&&t.a.label);
+    setVal('pLabelMode',manual?'manual':'auto'); show('rLabelTxt',k==='measure'&&manual); if(t.a)setVal('pLabel',t.a.label||'');
+    show('rSize',['text','callout','measure','poly','area','stamp'].includes(k)||(shape&&!!src.showDim)); setVal('pSize',String(src.size||10));
+    $('rSize').querySelector('.plabel').textContent=k==='stamp'?'Størrelse':'Tekststørrelse';
+    show('pLabReset',!!(t.a&&(t.a.lo||t.a.lo2)));
+    show('rLayer',!!t.a&&S.layers.length>1);
+    if(t.a){$('pLayer').innerHTML=S.layers.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('');$('pLayer').value=t.a.layer}
+    show('pDel',!!t.a);
+  }
+  show('secUnit',!!doc); show('secIns',!!doc&&tool!=='symbol'&&!(t&&['count','stamp','sign','symbol'].includes(t.kind)));
+  show('secCount',tool==='count'||!!(t&&t.kind==='count')); if(!$('secCount').hidden)renderCount();
+  show('secStamp',tool==='stamp'||!!(t&&t.kind==='stamp')); if(!$('secStamp').hidden)renderStamps();
+  show('secKit',!!doc); renderKit(); updFollow();
+  updGeo(); updIns();
+}
+function setProp(k,v){
+  const t=propTarget(); if(!t)return;
+  const setDef=kind=>{if(!defaults[kind])return;defaults[kind][k]=v;if(kind==='text')defaults.callout[k]=v;if(kind==='callout')defaults.text[k]=v};
+  if(t.a){pushHist();t.a[k]=v;if(DRAWKINDS.includes(tool))setDef(tool);commit()}
+  else {setDef(t.kind);updProps()}
+}
+$('pWidth').onchange=e=>setProp('width',num(e.target.value));
+$('pDash').onchange=e=>setProp('dash',e.target.value);
+$('pFill').onchange=e=>setProp('fill',e.target.value);
+$('pSize').onchange=e=>{setProp('size',num(e.target.value));if(editingId)placeEditor()};
+$('pEnds').onchange=e=>setProp('ends',e.target.value);
+$('pDim').onchange=e=>setProp('showDim',e.target.checked);
+$('pDimKind').onchange=e=>setProp('dimKind',e.target.value);
+$('pArrS').onclick=()=>{const t=propTarget();if(t)setProp('arrowStart',!(t.a||defaults[t.kind]).arrowStart)};
+$('pArrE').onclick=()=>{const t=propTarget();if(t)setProp('arrowEnd',!(t.a||defaults[t.kind]).arrowEnd)};
+$('pLayer').onchange=e=>{const t=propTarget();if(t&&t.a){pushHist();t.a.layer=e.target.value;if(!layerVisible(t.a.layer))selId=null;commit()}};
+$('pDel').onclick=()=>delSel();
+$('pLabReset').onclick=()=>{const t=propTarget();if(!t||!t.a)return;pushHist();delete t.a.lo;delete t.a.lo2;commit()};
+$('pLabelMode').onchange=e=>{const t=propTarget();if(!t||!t.a)return;pushHist();
+  t.a.label=e.target.value==='manual'?C.fmtLen(Math.hypot(t.a.x2-t.a.x1,t.a.y2-t.a.y1),annCtx(t.a.page+1)):'';commit();
+  if(t.a.label)setTimeout(()=>{$('pLabel').focus();$('pLabel').select()},20)};
+$('pLabel').addEventListener('focus',()=>{const t=propTarget();if(t&&t.a){pushHist();labelEditing=t.a}});
+$('pLabel').addEventListener('input',e=>{if(labelEditing){labelEditing.label=e.target.value;renderAnn(pages[labelEditing.page])}});
+$('pLabel').addEventListener('blur',()=>{if(labelEditing){labelEditing=null;commit()}});
+$('pLabel').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key==='Escape')e.target.blur()});
+let labelEditing=null;
+function delSel(){if(!selId)return;pushHist();S.annots=S.annots.filter(a=>a.id!==selId);selId=null;commit()}
+
+/* ---------- mål: enheder, aflæsning og indtastning ---------- */
+const UNITS={m:{real:1,f:1,s:'m',p:3},cm:{real:1,f:100,s:'cm',p:1},mm:{real:1,f:1000,s:'mm',p:0},pcm:{real:0,f:C.PT_MM/10,s:'cm',p:2},pmm:{real:0,f:C.PT_MM,s:'mm',p:1}};
+function inUnit(pi){return (S.inMode!=='paper'&&pageScale(pi??cur-1))?S.unit:'p'+S.paperUnit}
+const prec=U=>S.dec&&S.dec!=='auto'?+S.dec:U.p;
+function fromPt(pt,u,pi){const U=UNITS[u];if(U.real){const k=pageScale(pi);return k?pt*k*U.f:null}return pt*U.f}
+function fromPt2(pt2,u,pi){const U=UNITS[u];if(U.real){const k=pageScale(pi);return k?pt2*k*k*U.f*U.f:null}return pt2*U.f*U.f}
+function toPt(v,u,pi){const U=UNITS[u];if(U.real){const k=pageScale(pi);return k?v/U.f/k:null}return v/U.f}
+const fmtNum=(v,p)=>v==null?'':Number(v.toFixed(p)).toLocaleString('da-DK',{maximumFractionDigits:p,useGrouping:false});
+const angOf=a=>{let d=-Math.atan2(a.y2-a.y1,a.x2-a.x1)*180/Math.PI;return Math.abs(d)<1e-9?0:d};
+function geoFields(a){
+  if(a.type==='line'||a.type==='measure')return [{k:'len',l:'Længde',v:Math.hypot(a.x2-a.x1,a.y2-a.y1)},{k:'ang',l:'Vinkel (°)',v:angOf(a),ang:1}];
+  if(a.type==='rect')return [{k:'w',l:'Bredde',v:a.w},{k:'h',l:'Højde',v:a.h}];
+  if(a.type==='circle')return [{k:'d',l:'Diameter',v:2*a.r},{k:'r',l:'Radius',v:a.r}];
+  if(a.type==='poly')return [{k:'plen',l:'Længde i alt',v:C.polyLen(a.pts,false),ro:1},{k:'pn',l:'Punkter',v:a.pts.length/2,ro:1,raw:1}];
+  if(a.type==='area')return [{k:'ar',l:'Areal',v:C.polyArea(a.pts),ro:1,area:1},{k:'om',l:'Omkreds',v:C.polyLen(a.pts,true),ro:1}];
+  return null;
+}
+function updGeo(){
+  const pi=selId?(S.annots.find(x=>x.id===selId)||{}).page??cur-1:cur-1, u=inUnit(pi), U=UNITS[u], noScale=S.inMode!=='paper'&&!pageScale(pi);
+  $('mReal').textContent='Virkelige mål ('+S.unit+')'; $('mPaper').textContent='Papirmål ('+S.paperUnit+')';
+  $('mReal').setAttribute('aria-pressed',S.inMode!=='paper'); $('mPaper').setAttribute('aria-pressed',S.inMode==='paper');
+  $('uNote').textContent=noScale?'Side '+(pi+1)+' har ingen skala, så mål skrives og vises på papiret i '+S.paperUnit+'.':(U.real?'Mål i '+S.unit+' ved '+(ratioText(pageScale(pi))||'')+'.':'Mål direkte på papiret i '+S.paperUnit+'.');
+  $('uNote').classList.toggle('warn',noScale);
+  const a=selId&&S.annots.find(x=>x.id===selId), f=a&&geoFields(a);
+  ['1','2'].forEach((n,i)=>{
+    const row=$('rG'+n), inp=$('g'+n);
+    if(!f){row.hidden=true;return}
+    row.hidden=false; const fd=f[i]; inp.dataset.k=fd.k;
+    $('g'+n+'l').textContent=fd.ang||fd.raw?fd.l:fd.l+' ('+U.s+(fd.area?'²':'')+')'; inp.readOnly=!!fd.ro;
+    setVal('g'+n,fd.ang?fmtNum(fd.v,1):fd.raw?String(fd.v):fd.area?fmtNum(fromPt2(fd.v,u,a.page),prec(U)):fmtNum(fromPt(fd.v,u,a.page),prec(U)));
+  });
+}
+function setGeo(inp){
+  const a=selId&&S.annots.find(x=>x.id===selId); if(!a)return;
+  const k=inp.dataset.k, v=num(inp.value); if(!isFinite(v)){updGeo();return}
+  let pt=null; if(k!=='ang'){pt=toPt(v,inUnit(),a.page);if(pt==null){toast('Sæt skala først for at bruge virkelige mål.');updGeo();return} if(!(pt>0)){updGeo();return}}
+  pushHist();
+  if(a.type==='line'||a.type==='measure'){
+    const d=Math.hypot(a.x2-a.x1,a.y2-a.y1), ang=(k==='ang'?v:angOf(a))*Math.PI/180, L=k==='len'?pt:d;
+    a.x2=a.x1+Math.cos(ang)*L; a.y2=a.y1-Math.sin(ang)*L;
+  } else if(a.type==='rect'){ if(k==='w')a.w=pt; else a.h=pt }
+  else if(a.type==='circle'){ a.r=k==='d'?pt/2:pt }
+  commit();
+}
+['g1','g2'].forEach(id=>{const el=$(id);el.addEventListener('change',()=>setGeo(el));el.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();setGeo(el);el.select()}})});
+$('mReal').onclick=()=>{S.inMode='real';persist();updGeo();updIns()};
+$('mPaper').onclick=()=>{S.inMode='paper';persist();updGeo();updIns()};
+$('uSet').onclick=()=>openSettings();
+
+/* ---------- indsæt figur ud fra mål ---------- */
+function updIns(){
+  const t=$('iType').value, U=UNITS[inUnit(cur-1)], circ=t==='circle', isL=t==='line'||t==='arrow'||t==='measure';
+  $('rICk').hidden=!circ; $('rI2').hidden=circ;
+  $('i1l').textContent=(circ?($('iCk').value==='r'?'Radius':'Diameter'):isL?'Længde':'Bredde')+' ('+U.s+')';
+  $('i2l').textContent=isL?'Vinkel (°)':'Højde ('+U.s+')';
+  $('iGo').textContent='Indsæt på side '+cur;
+}
+$('iType').onchange=()=>{const t=$('iType').value;if(t==='rect'&&$('i2').value==='0')$('i2').value=$('i1').value;updIns()};
+$('iCk').onchange=updIns;
+['i1','i2'].forEach(id=>$(id).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();insertShape()}}));
+$('iGo').onclick=insertShape;
+function insertShape(){
+  if(!doc)return; finishEdit();
+  const t=$('iType').value, pi=cur-1, u=inUnit(pi), p=pages[pi];
+  const v1=num($('i1').value), v2=num($('i2').value);
+  if(!(v1>0)){toast('Skriv et mål større end 0.');$('i1').focus();return}
+  const L1=toPt(v1,u,pi); if(L1==null){toast('Siden har ingen skala. Sæt skala, eller vælg mål på papiret.');return}
+  const vr=viewer.getBoundingClientRect(), pr=p.el.getBoundingClientRect();
+  const cxS=Math.min(Math.max((vr.left+vr.right)/2,pr.left+10),pr.right-10), cyS=Math.min(Math.max((vr.top+vr.bottom)/2,pr.top+10),pr.bottom-10);
+  const c=evtPt(p,{clientX:cxS,clientY:cyS});
+  let a;
+  if(t==='circle'){const r=$('iCk').value==='r'?L1:L1/2;a=Object.assign({},defaults.circle,{type:'circle',cx:c.x,cy:c.y,r,dimKind:$('iCk').value})}
+  else if(t==='rect'){const L2=toPt(v2,u,pi);if(!(L2>0)){toast('Skriv en højde større end 0.');$('i2').focus();return}
+    a=Object.assign({},defaults.rect,{type:'rect',x:c.x-L1/2,y:c.y-L2/2,w:L1,h:L2})}
+  else {const ang=(isFinite(v2)?v2:0)*Math.PI/180, dx=Math.cos(ang)*L1/2, dy=-Math.sin(ang)*L1/2;
+    a=Object.assign({},t==='measure'?defaults.measure:defaults[t],{type:t==='measure'?'measure':'line',x1:c.x-dx,y1:c.y-dy,x2:c.x+dx,y2:c.y+dy},t==='measure'?{label:''}:{})}
+  if(tool!=='select')setTool('select');
+  addAnnot(a,pi,true);
+  toast(NAMES[t==='measure'?'measure':t]+' indsat på side '+(pi+1));
+}
+
+/* ---------- paneler ---------- */
+let autoPrev=null;   // hvor man var, før Værktøj-fanen kom frem automatisk
+function autoPanel(){
+  if(curTab==='Tool'&&(autoPrev||!app.classList.contains('noside')||app.classList.contains('peek')))return;
+  const sideOpen=!app.classList.contains('noside');
+  if(!sideOpen&&small())return;            // på mobil åbnes panelet kun manuelt
+  autoPrev={tab:curTab,side:sideOpen};
+  if(!sideOpen){setTopH();app.classList.add('peek')}
+  showTab('Tool',true);
+}
+function restorePanel(){
+  if(!autoPrev)return; const p=autoPrev; autoPrev=null;
+  showTab(p.tab,true); if(!p.side)app.classList.remove('peek');
+}
+function goHome(){
+  finishEdit(); cancelPoly(); if(tool!=='select')setTool('select');
+  selId=null; renderAllAnn(); updProps(); restorePanel();
+}
+$('pDone').onclick=goHome;
+function setTopH(){app.style.setProperty('--toph',document.querySelector('.tools').getBoundingClientRect().bottom+'px')}
+new ResizeObserver(setTopH).observe(document.querySelector('.tools'));
+
+/* ---------- indstillinger for enheder ---------- */
+function openSettings(){
+  if(!doc)return; const d=unitDefaults();
+  $('sU').value=S.unit;$('sP').value=S.paperUnit;$('sD').value=S.dec||'auto';$('sName').value=userName();
+  $('dU').value=d.unit;$('dP').value=d.paperUnit;$('dD').value=d.dec;
+  $('setBox').hidden=false; setTimeout(()=>(userName()?$('sU'):$('sName')).focus(),30);
+}
+$('btnSet').onclick=openSettings;
+$('setCopy').onclick=()=>{$('dU').value=$('sU').value;$('dP').value=$('sP').value;$('dD').value=$('sD').value};
+$('setCancel').onclick=()=>$('setBox').hidden=true;
+$('setForm').onsubmit=e=>{e.preventDefault();
+  const ch=S.unit!==$('sU').value||S.paperUnit!==$('sP').value||S.dec!==$('sD').value;
+  if(ch){pushHist();S.unit=$('sU').value;S.paperUnit=$('sP').value;S.dec=$('sD').value}
+  store.set('bladr:defaults',JSON.stringify({unit:$('dU').value,paperUnit:$('dP').value,dec:$('dD').value}));
+  store.set('bladr:user',$('sName').value.trim());
+  $('setBox').hidden=true; commit(); toast('Indstillinger gemt');
+};
+
+/* ---------- lag ---------- */
+let renaming=null, confirmDel=null;
+const EYE='<svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_OFF='<svg viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.2M6.6 6.6C3.7 8.5 2 12 2 12s3.5 7 10 7a9.6 9.6 0 0 0 5.4-1.6"/></svg>';
+const PEN='<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>';
+function renderLayers(){
+  const box=$('layers');box.innerHTML='';
+  S.layers.forEach(l=>{
+    const n=S.annots.filter(a=>a.layer===l.id).length;
+    const row=document.createElement('div');row.className='layer'+(l.id===S.active?' act':'')+(l.visible?'':' off');
+    if(renaming===l.id){
+      row.innerHTML=`<input value="${esc(l.name)}" aria-label="Lagets navn">`;
+      const inp=row.querySelector('input');
+      const done=ok=>{if(renaming!==l.id)return;renaming=null;const v=inp.value.trim();if(ok&&v&&v!==l.name){pushHist();l.name=v}commit()};
+      inp.onkeydown=e=>{e.stopPropagation();if(e.key==='Enter')done(true);if(e.key==='Escape')done(false)};inp.onblur=()=>done(true);
+      box.appendChild(row);setTimeout(()=>{inp.focus();inp.select()},10);return;
+    }
+    row.innerHTML=`<button class="x eye" title="${l.visible?'Skjul':'Vis'} lag" aria-label="${l.visible?'Skjul':'Vis'} ${esc(l.name)}">${l.visible?EYE:EYE_OFF}</button>
+      <button class="lname" title="Gør til aktivt lag"><b>${esc(l.name)}</b><small>${n} ${n===1?'markering':'markeringer'}${l.id===S.active?' · aktivt':''}</small></button>
+      <button class="x ren" title="Omdøb" aria-label="Omdøb ${esc(l.name)}">${PEN}</button>
+      ${S.layers.length>1?(confirmDel===l.id?'<button class="x confirm del">Slet?</button>':'<button class="x del" title="Slet lag" aria-label="Slet '+esc(l.name)+'">✕</button>'):''}`;
+    row.querySelector('.eye').onclick=()=>{l.visible=!l.visible;if(!l.visible&&selId&&S.annots.find(a=>a.id===selId)?.layer===l.id)selId=null;commit()};
+    row.querySelector('.lname').onclick=()=>{S.active=l.id;commit()};
+    row.querySelector('.lname').ondblclick=()=>{renaming=l.id;renderLayers()};
+    row.querySelector('.ren').onclick=()=>{renaming=l.id;renderLayers()};
+    const del=row.querySelector('.del');
+    if(del)del.onclick=()=>{
+      if(confirmDel!==l.id&&n>0){confirmDel=l.id;renderLayers();setTimeout(()=>{if(confirmDel===l.id){confirmDel=null;renderLayers()}},3500);return}
+      confirmDel=null;pushHist();S.annots=S.annots.filter(a=>a.layer!==l.id);S.layers=S.layers.filter(x=>x!==l);
+      if(S.active===l.id)S.active=S.layers[0].id;if(selId&&!S.annots.some(a=>a.id===selId))selId=null;commit();
+    };
+    box.appendChild(row);
+  });
+}
+$('addLayer').onclick=()=>{pushHist();let i=S.layers.length+1;while(S.layers.some(l=>l.name==='Lag '+i))i++;const l={id:uid(),name:'Lag '+i,visible:true};S.layers.push(l);S.active=l.id;renaming=l.id;commit()};
+
+/* ---------- skala ---------- */
+let calib=null;
+const RATIO_K=C.PT_MM/1000;     // meter pr. pt ved 1:1
+function ratioText(k){if(!k)return null;const r=k/RATIO_K;return '1:'+(Math.abs(r-Math.round(r))<0.05?Math.round(r).toLocaleString('da-DK'):r.toFixed(1).replace('.',','))}
+function updScaleBtn(){$('scaleTxt').textContent=ratioText(pageScale(cur-1))||'Ingen skala'}
+function openScale(fromCal){
+  if(!doc)return;
+  $('scPage').textContent=fromCal&&calib?calib.page+1:cur;
+  const k=pageScale((fromCal&&calib?calib.page:cur-1));
+  $('scNow').textContent=ratioText(k)||'ingen';
+  $('ratioIn').value=k?String(Math.round(k/RATIO_K*10)/10).replace('.',','):'';
+  $('calBox').hidden=!(fromCal&&calib);
+  if(fromCal&&calib){$('calStart').textContent='Mål igen ('+(calib.pt*C.PT_MM).toFixed(1).replace('.',',')+' mm på papiret)';$('calLen').value='';$('calUnit').value=S.unit==='mm'?'mm':S.unit;}
+  else {$('calStart').textContent='Mål et stykke på tegningen';calib=null}
+  $('scaleBox').hidden=false;
+  setTimeout(()=>(fromCal&&calib?$('calLen'):$('ratioIn')).focus(),30);
+}
+function applyScale(k){
+  const pi=calib?calib.page:cur-1; pushHist();
+  if($('scThis').checked){if(k)S.scales.pages[pi]=k;else delete S.scales.pages[pi]}
+  else {S.scales.all=k;S.scales.pages={}}
+  calib=null;$('scaleBox').hidden=true;commit();
+  toast(k?'Skala sat til '+ratioText(k):'Skala fjernet');
+}
+$('btnScale').onclick=()=>openScale(false);
+$('ratioApply').onclick=()=>{const r=num($('ratioIn').value);if(!(r>0)){toast('Skriv et tal, fx 100 for 1:100.');return}applyScale(r*RATIO_K)};
+$('ratioIn').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('ratioApply').click()}};
+$('calStart').onclick=()=>{$('scaleBox').hidden=true;setTool('calibrate')};
+$('calApply').onclick=()=>{const v=num($('calLen').value);if(!(v>0)){toast('Skriv den virkelige længde af det målte stykke.');return}
+  const f={m:1,cm:0.01,mm:0.001}[$('calUnit').value];applyScale(v*f/calib.pt)};
+$('calLen').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('calApply').click()}};
+$('scUnits').onclick=()=>{$('scaleBox').hidden=true;calib=null;openSettings()};
+$('scClear').onclick=()=>applyScale(null);
+$('scClose').onclick=()=>{$('scaleBox').hidden=true;calib=null};
+$('scaleForm').onsubmit=e=>e.preventDefault();
+
+/* ---------- underskrift ---------- */
+const SIG_FONTS=['"Great Vibes", cursive','"Dancing Script", cursive','"Caveat", cursive'];
+let pendingSig=null, ghost=null, sigMode='draw', sigInk=[], sigColor='#1a2b6d', sigFont=0, sigImg=null, padStroke=null;
+const pad=$('sigPad'), pctx=pad.getContext('2d');
+function loadSaved(){try{return JSON.parse(localStorage.getItem('bladr:sigs')||'[]')||[]}catch{return []}}
+function storeSaved(l){try{localStorage.setItem('bladr:sigs',JSON.stringify(l));return true}catch{return false}}
+function sigAnn(sg,x,y,w){const h=w/sg.ratio;return Object.assign({type:'sign',x,y,w,h,color:sg.color||'#111111'},sg.src?{src:sg.src}:{ink:sg.ink,lw:sg.lw})}
+function sigThumb(sg){const a=sigAnn(sg,0,0,40*sg.ratio);return `<svg viewBox="0 0 ${a.w} ${a.h}" width="${Math.min(180,a.w)}" height="40" preserveAspectRatio="xMinYMid meet" aria-hidden="true">${C.primsToSvg(C.prims(a,{}))}</svg>`}
+function renderSaved(){
+  const box=$('sigSaved'), l=loadSaved(); $('sigSavedWrap').hidden=!l.length; box.innerHTML='';
+  l.forEach((sg,i)=>{const d=document.createElement('div');d.className='sigitem';
+    d.innerHTML=`<button type="button" class="sigpick" title="Brug denne underskrift">${sigThumb(sg)}</button><button type="button" class="x" aria-label="Slet gemt underskrift">✕</button>`;
+    d.querySelector('.sigpick').onclick=()=>useSig(sg);
+    d.querySelector('.x').onclick=()=>{const l2=loadSaved();l2.splice(i,1);storeSaved(l2);renderSaved()};
+    box.appendChild(d)});
+}
+function openSig(){ if(!doc)return; finishEdit(); renderSaved(); $('sigBox').hidden=false; setSigMode(sigMode); }
+function setSigMode(m){ sigMode=m;
+  ['draw','type','img'].forEach(k=>{$('sm_'+k).setAttribute('aria-pressed',k===m);$('sp_'+k).hidden=k!==m});
+  if(m==='draw')requestAnimationFrame(sizePad); if(m==='type')updFonts(); }
+['draw','type','img'].forEach(k=>$('sm_'+k).onclick=()=>setSigMode(k));
+document.querySelectorAll('.sigcol').forEach(b=>b.onclick=()=>{sigColor=b.dataset.c;document.querySelectorAll('.sigcol').forEach(x=>x.setAttribute('aria-pressed',x===b));redrawPad();updFonts()});
+function sizePad(){const r=pad.getBoundingClientRect();if(!r.width)return;const d=devicePixelRatio||1;pad.width=r.width*d;pad.height=r.height*d;pctx.setTransform(d,0,0,d,0,0);redrawPad()}
+function redrawPad(){const r=pad.getBoundingClientRect();pctx.clearRect(0,0,r.width,r.height);pctx.strokeStyle=sigColor;pctx.lineWidth=2.6;pctx.lineCap='round';pctx.lineJoin='round';
+  sigInk.forEach(s=>{pctx.beginPath();pctx.moveTo(s[0],s[1]);for(let i=2;i<s.length;i+=2)pctx.lineTo(s[i],s[i+1]);if(s.length===2)pctx.lineTo(s[0]+0.1,s[1]);pctx.stroke()});
+  $('sigPadHint').hidden=sigInk.length>0}
+const padPt=e=>{const r=pad.getBoundingClientRect();return [e.clientX-r.left,e.clientY-r.top]};
+pad.addEventListener('pointerdown',e=>{e.preventDefault();pad.setPointerCapture(e.pointerId);padStroke=padPt(e);sigInk.push(padStroke);redrawPad()});
+pad.addEventListener('pointermove',e=>{if(!padStroke)return;const q=padPt(e),n=padStroke.length;if(Math.hypot(q[0]-padStroke[n-2],q[1]-padStroke[n-1])<1.2)return;padStroke.push(q[0],q[1]);redrawPad()});
+['pointerup','pointercancel'].forEach(t=>pad.addEventListener(t,()=>{padStroke=null}));
+$('sigClear').onclick=()=>{sigInk=[];redrawPad()};
+$('sigUndoStroke').onclick=()=>{sigInk.pop();redrawPad()};
+function inkToSig(){
+  if(!sigInk.length)return null; let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  sigInk.forEach(s=>{for(let i=0;i<s.length;i+=2){x0=Math.min(x0,s[i]);x1=Math.max(x1,s[i]);y0=Math.min(y0,s[i+1]);y1=Math.max(y1,s[i+1])}});
+  const lw=2.6; x0-=lw;y0-=lw;x1+=lw;y1+=lw; const w=Math.max(x1-x0,6),h=Math.max(y1-y0,6);
+  return {ink:sigInk.map(s=>s.map((v,i)=>+((i%2?(v-y0)/h:(v-x0)/w).toFixed(4)))),lw:lw/h,ratio:w/h,color:sigColor};
+}
+function updFonts(){const name=$('sigName').value.trim()||'Dit navn';
+  document.querySelectorAll('.fontopt').forEach((b,i)=>{b.textContent=name;b.style.fontFamily=SIG_FONTS[i];b.style.color=sigColor;b.setAttribute('aria-pressed',i===sigFont)})}
+$('sigName').addEventListener('input',updFonts);
+$('sigName').addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();$('sigUse').click()}});
+document.querySelectorAll('.fontopt').forEach((b,i)=>b.onclick=()=>{sigFont=i;updFonts()});
+function cropCanvas(c){
+  const x=c.getContext('2d'),W=c.width,H=c.height,d=x.getImageData(0,0,W,H).data; let x0=W,y0=H,x1=-1,y1=-1;
+  for(let y=0;y<H;y++)for(let xx=0;xx<W;xx++)if(d[(y*W+xx)*4+3]>10){if(xx<x0)x0=xx;if(xx>x1)x1=xx;if(y<y0)y0=y;if(y>y1)y1=y}
+  if(x1<0)return null; const p=4; x0=Math.max(0,x0-p);y0=Math.max(0,y0-p);x1=Math.min(W-1,x1+p);y1=Math.min(H-1,y1+p);
+  const ow=x1-x0+1,oh=y1-y0+1,o=document.createElement('canvas');o.width=ow;o.height=oh;o.getContext('2d').drawImage(c,x0,y0,ow,oh,0,0,ow,oh);
+  return {src:o.toDataURL('image/png'),ratio:ow/oh};
+}
+async function typedToSig(){
+  const name=$('sigName').value.trim(); if(!name)return null; const F=SIG_FONTS[sigFont];
+  try{await document.fonts.load('110px '+F,name)}catch{}
+  const c=document.createElement('canvas'),x=c.getContext('2d'); x.font='110px '+F;
+  const w=Math.ceil(x.measureText(name).width+80); c.width=w; c.height=200;
+  x.font='110px '+F; x.fillStyle=sigColor; x.fillText(name,40,135);
+  const r=cropCanvas(c); return r&&Object.assign(r,{color:sigColor});
+}
+$('sigFile').onchange=e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f)return;
+  const url=URL.createObjectURL(f), img=new Image();
+  img.onload=()=>{
+    const sc=Math.min(1,1400/img.width), W=Math.round(img.width*sc), H=Math.round(img.height*sc), c=document.createElement('canvas'); c.width=W;c.height=H;
+    const x=c.getContext('2d'); x.drawImage(img,0,0,W,H); const id=x.getImageData(0,0,W,H), d=id.data, hi=200, lo=110;
+    for(let i=0;i<d.length;i+=4){const L=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]; d[i+3]=L>=hi?0:L<=lo?d[i+3]:Math.round(d[i+3]*(hi-L)/(hi-lo))}
+    x.putImageData(id,0,0); URL.revokeObjectURL(url);
+    sigImg=cropCanvas(c);
+    $('sigImgPrev').innerHTML=sigImg?`<img src="${sigImg.src}" alt="Forhåndsvisning af underskrift">`:'<span class="hint">Der blev ikke fundet nogen underskrift på billedet. Prøv et billede med mørk skrift på lys baggrund.</span>';
+  };
+  img.onerror=()=>{URL.revokeObjectURL(url);toast('Billedet kunne ikke åbnes.')};
+  img.src=url;
+};
+$('sigUse').onclick=async()=>{
+  const sg=sigMode==='draw'?inkToSig():sigMode==='type'?await typedToSig():sigImg;
+  if(!sg){toast(sigMode==='draw'?'Tegn din underskrift først.':sigMode==='type'?'Skriv dit navn først.':'Vælg et billede af din underskrift først.');return}
+  if($('sigSave').checked){const l=loadSaved();l.unshift(sg);if(!storeSaved(l.slice(0,6)))toast('Underskriften kunne ikke gemmes i browseren, men kan stadig bruges nu.')}
+  useSig(sg);
+};
+$('sigCancel').onclick=()=>$('sigBox').hidden=true;
+function useSig(sg){$('sigBox').hidden=true;setTool('sign');pendingSig=Object.assign({},sg,{withDate:$('sigDate').checked});updProps()}
+function sigWidth(p){return Math.min(160,sizes[p.n-1].w*0.35)}
+function placeSig(p,pt){
+  const sg=pendingSig, w=sigWidth(p), h=w/sg.ratio, a=sigAnn(sg,pt.x-w/2,pt.y-h/2,w), withDate=sg.withDate;
+  pendingSig=null; ghost=null; setTool('select');
+  addAnnot(a,p.n-1,true);
+  if(withDate){const dt=new Date().toLocaleDateString('da-DK',{day:'2-digit',month:'2-digit',year:'numeric'});
+    S.annots.push(meta({id:uid(),layer:S.active,page:p.n-1,type:'text',x:a.x,y:a.y+a.h+1,text:dt,size:10,color:'#111111',width:1,dash:'none',fill:'none'}));commit()}
+  autoPanel(); toast('Underskrift indsat. Træk i hjørnet for at ændre størrelsen.');
+}
+function ghostSvg(p){
+  if(ghost&&ghost.p===p&&tool==='symbol'&&pendingSym){const {w,h}=symSize(pendingSym);return `<image href="${pendingSym.src}" x="${ghost.pt.x-w/2}" y="${ghost.pt.y-h/2}" width="${w}" height="${h}" opacity="0.55"/>`}
+  if(ghost&&ghost.p===p&&tool==='stamp'&&!selId)return '<g opacity="0.5">'+C.primsToSvg(C.prims(makeStamp(ghost.pt.x,ghost.pt.y),{}))+'</g>';
+  if(!ghost||ghost.p!==p||!pendingSig)return ''; const w=sigWidth(p), h=w/pendingSig.ratio;
+  return '<g opacity="0.55">'+C.primsToSvg(C.prims(sigAnn(pendingSig,ghost.pt.x-w/2,ghost.pt.y-h/2,w),{}))+'</g>';
+}
+$('btnSign').onclick=openSig;
+
+/* ---------- metadata, navn ---------- */
+function userName(){try{return localStorage.getItem('bladr:user')||''}catch{return ''}}
+function meta(a){if(!a.created){a.created=Date.now();a.author=userName();if(activeKit&&!a.kit)a.kit=activeKit}return a}
+const today=()=>new Date().toLocaleDateString('da-DK',{day:'2-digit',month:'2-digit',year:'numeric'});
+
+/* ---------- polylinje og areal ---------- */
+let polyDraw=null;
+function lastPt(){const p=polyDraw.pts,n=p.length;return {x:p[n-2],y:p[n-1]}}
+function polyClick(p,pt,e){
+  if(!polyDraw&&selId){goHome();return}
+  if(polyDraw&&polyDraw.p!==p){finishPoly();return}
+  if(!polyDraw)polyDraw={p,pts:[],hover:null};
+  const n=polyDraw.pts.length, q=n?snap45(lastPt(),pt,e):pt;
+  if(n>=2&&Math.hypot(q.x-polyDraw.pts[n-2],q.y-polyDraw.pts[n-1])*scale<6){finishPoly();return}
+  if(tool==='area'&&n>=6&&Math.hypot(q.x-polyDraw.pts[0],q.y-polyDraw.pts[1])*scale<9){finishPoly();return}
+  polyDraw.pts.push(q.x,q.y); renderAnn(p);
+}
+function finishPoly(){
+  const d=polyDraw; polyDraw=null; if(!d)return;
+  const kind=tool==='area'?'area':'poly';
+  if(d.pts.length<(kind==='area'?6:4)){renderAnn(d.p);toast(kind==='area'?'Et areal skal have mindst tre punkter.':'En polylinje skal have mindst to punkter.');return}
+  addAnnot(Object.assign({type:kind,pts:d.pts.slice()},defaults[kind]),d.p.n-1,true);
+}
+function cancelPoly(){if(!polyDraw)return;const p=polyDraw.p;polyDraw=null;renderAnn(p)}
+function polyPreview(p){
+  if(!polyDraw||polyDraw.p!==p||!polyDraw.pts.length)return '';
+  const pts=polyDraw.pts.slice(); if(polyDraw.hover)pts.push(polyDraw.hover.x,polyDraw.hover.y);
+  const kind=tool==='area'?'area':'poly', s=scale;
+  let h='';
+  if(pts.length>=4)h+=C.primsToSvg(C.prims(Object.assign({},defaults[kind],{type:kind,pts}),annCtx(p.n)));
+  for(let i=0;i<polyDraw.pts.length;i+=2)h+=`<circle cx="${polyDraw.pts[i]}" cy="${polyDraw.pts[i+1]}" r="${3/s}" fill="#ffffff" stroke="#1f5f8b" stroke-width="${1.2/s}"/>`;
+  return h;
+}
+
+/* ---------- tælleværktøj ---------- */
+let countStack=[];
+const SHAPES={circle:'Cirkel',square:'Firkant',triangle:'Trekant',diamond:'Rombe'};
+function activeGroup(){return S.countGroups.find(g=>g.id===S.activeCount)}
+function ensureGroup(){
+  let g=activeGroup(); if(g)return g;
+  g=S.countGroups[0]; if(!g){g={id:uid(),name:'Punkt',color:COLORS[S.countGroups.length%COLORS.length],shape:'circle'};S.countGroups.push(g)}
+  S.activeCount=g.id; return g;
+}
+function placeCount(p,pt){
+  const g=ensureGroup();
+  const a=addAnnot({type:'count',x:pt.x,y:pt.y,group:g.id,size:defaults.count.size},p.n-1,false);
+  countStack.push(a.id);
+}
+function groupCounts(gid){const all=S.annots.filter(a=>a.type==='count'&&a.group===gid);return {page:all.filter(a=>a.page===cur-1).length,total:all.length}}
+let cDelConfirm=null;
+function renderCount(){
+  const box=$('cGroups'); box.innerHTML='';
+  if(!S.countGroups.length){box.innerHTML='<p class="pnote">Ingen grupper endnu. Klik på tegningen for at starte, eller tilføj en gruppe herunder.</p>'}
+  S.countGroups.forEach(g=>{
+    const c=groupCounts(g.id), row=document.createElement('div'); row.className='cgroup'+(g.id===S.activeCount?' act':'');
+    const sym=`<svg viewBox="-6 -6 12 12" width="14" height="14" aria-hidden="true"><path d="${C.opsToD(C.markerOps(g.shape,0,0,4.2))}" fill="${g.color}"/></svg>`;
+    row.innerHTML=`<button type="button" class="cpick">${sym}<span class="cname">${esc(g.name)}</span><span class="cnum">${c.page} / ${c.total}</span></button>`+
+      (cDelConfirm===g.id?'<button type="button" class="x confirm">Slet?</button>':'<button type="button" class="x" aria-label="Slet gruppe">✕</button>');
+    row.querySelector('.cpick').onclick=()=>{S.activeCount=g.id;persist();if(tool!=='count')setTool('count');renderCount()};
+    row.querySelector('.cpick').ondblclick=()=>{const nm=$('cNew');nm.value=g.name;nm.dataset.rename=g.id;$('cAdd').textContent='Omdøb';nm.focus()};
+    row.querySelector('.x').onclick=()=>{
+      if(c.total&&cDelConfirm!==g.id){cDelConfirm=g.id;renderCount();setTimeout(()=>{if(cDelConfirm===g.id){cDelConfirm=null;renderCount()}},3500);return}
+      cDelConfirm=null;pushHist();S.annots=S.annots.filter(a=>!(a.type==='count'&&a.group===g.id));S.countGroups=S.countGroups.filter(x=>x!==g);
+      if(S.activeCount===g.id)S.activeCount=S.countGroups[0]?.id||null;commit()};
+    box.appendChild(row);
+  });
+  const g=activeGroup();
+  $('rCShape').hidden=$('rCColor').hidden=!g;
+  if(g){setVal('cShape',g.shape);document.querySelectorAll('#cColor .sw').forEach(b=>b.setAttribute('aria-pressed',b.dataset.c===g.color))}
+  $('cHead').textContent='Grupper · side '+cur+' / i alt';
+}
+COLORS.concat(['#7048e8','#0ca678']).forEach(c=>{const b=document.createElement('button');b.className='sw';b.style.background=c;b.dataset.c=c;b.setAttribute('aria-label','Farve '+c);
+  b.onclick=()=>{const g=activeGroup();if(!g)return;pushHist();g.color=c;commit()};$('cColor').appendChild(b)});
+$('cShape').onchange=e=>{const g=activeGroup();if(!g)return;pushHist();g.shape=e.target.value;commit()};
+$('cAdd').onclick=()=>{
+  const nm=$('cNew'), v=nm.value.trim(); if(!v){nm.focus();return}
+  pushHist();
+  if(nm.dataset.rename){const g=S.countGroups.find(x=>x.id===nm.dataset.rename);if(g)g.name=v;delete nm.dataset.rename;$('cAdd').textContent='Tilføj'}
+  else{const used=S.countGroups.map(g=>g.color);const g={id:uid(),name:v,color:COLORS.find(c=>!used.includes(c))||COLORS[S.countGroups.length%COLORS.length],shape:'circle'};S.countGroups.push(g);S.activeCount=g.id;if(tool!=='count')setTool('count')}
+  nm.value='';commit();
+};
+$('cNew').addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();$('cAdd').click()}});
+$('cInsert').onclick=()=>{
+  if(!S.countGroups.length){toast('Der er ikke talt noget endnu.');return}
+  const pi=cur-1, rows=S.countGroups.map(g=>{const n=S.annots.filter(a=>a.type==='count'&&a.group===g.id&&a.page===pi).length;return [g.name,n]}).filter(r=>r[1]);
+  if(!rows.length){toast('Der er ikke talt noget på denne side.');return}
+  const w=Math.max(...rows.map(r=>r[0].length))+2, text='OPTÆLLING\n'+rows.map(r=>r[0]+': '+r[1]).join('\n');
+  const p=pages[pi], vr=viewer.getBoundingClientRect(), pr=p.el.getBoundingClientRect();
+  const c=evtPt(p,{clientX:Math.max(pr.left+20,Math.min(pr.right-150,(vr.left+vr.right)/2)),clientY:Math.max(pr.top+20,Math.min(pr.bottom-80,(vr.top+vr.bottom)/2))});
+  if(tool!=='select')setTool('select');
+  addAnnot({type:'text',x:c.x,y:c.y,text,size:10,color:'#212529',width:1,dash:'solid',fill:'white'},pi,true);
+  toast('Optælling indsat. Den opdateres ikke automatisk, hvis du tæller videre.',4200);
+};
+
+/* ---------- stempler ---------- */
+const STAMPS=[['GODKENDT','#2f9e44'],['KONTROLLERET','#1c7ed6'],['SOM UDFØRT','#1c7ed6'],['UDBEDRET','#2f9e44'],['FORELØBIG','#f08c00'],['IKKE GODKENDT','#e03131'],['AFVIST','#e03131']];
+function renderStamps(){
+  const box=$('stampList'), t=propTarget(), src=t&&t.a&&t.a.type==='stamp'?t.a:defaults.stamp;
+  box.innerHTML=''; STAMPS.forEach(([l,c])=>{const b=document.createElement('button');b.type='button';b.className='stampbtn';b.textContent=l;b.style.color=c;b.style.borderColor=c;
+    b.setAttribute('aria-pressed',src.label===l);b.onclick=()=>{setStamp(l,c)};box.appendChild(b)});
+  setVal('stCustom',STAMPS.some(s=>s[0]===src.label)?'':src.label||'');
+  const isSel=!!(t&&t.a); $('rStOpts').hidden=isSel;
+  $('stName').checked=!!defaults.stamp.showName; $('stDate').checked=!!defaults.stamp.showDate;
+  $('stNoName').hidden=isSel||!defaults.stamp.showName||!!userName();
+}
+function setStamp(label,color){
+  const t=propTarget();
+  if(t&&t.a&&t.a.type==='stamp'){pushHist();t.a.label=label;if(color)t.a.color=color;commit()}
+  else{defaults.stamp.label=label;if(color)defaults.stamp.color=color;if(tool!=='stamp')setTool('stamp');updProps()}
+}
+$('stCustom').addEventListener('change',e=>{const v=e.target.value.trim().toUpperCase();if(v)setStamp(v,null)});
+$('stCustom').addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();e.target.blur()}});
+$('stName').onchange=e=>{defaults.stamp.showName=e.target.checked;renderStamps()};
+$('stDate').onchange=e=>{defaults.stamp.showDate=e.target.checked};
+$('stSet').onclick=()=>openSettings();
+function makeStamp(cx,cy){
+  const d=defaults.stamp, sub=[d.showName&&userName(),d.showDate&&today()].filter(Boolean).join(' · ');
+  const a={type:'stamp',x:0,y:0,label:d.label,sub,color:d.color,size:d.size};
+  const b=C.stampBox(a); a.x=cx-b.w/2; a.y=cy-b.h/2; return a;
+}
+
+/* ---------- opfølgning (status og kommentar) ---------- */
+const STATUS={open:'Åben',progress:'I gang',done:'Udbedret',rejected:'Afvist'};
+let noteEditing=null;
+function updFollow(){
+  const a=selId&&S.annots.find(x=>x.id===selId); $('secFollow').hidden=!a; if(!a)return;
+  setVal('fStatus',a.status||''); setVal('fNote',a.note||'');
+  $('fMeta').textContent=a.created?'Oprettet '+new Date(a.created).toLocaleString('da-DK',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})+(a.author?' af '+a.author:''):'';
+}
+$('fStatus').onchange=e=>{const a=S.annots.find(x=>x.id===selId);if(!a)return;pushHist();a.status=e.target.value||undefined;commit()};
+$('fNote').addEventListener('focus',()=>{const a=S.annots.find(x=>x.id===selId);if(a){pushHist();noteEditing=a}});
+$('fNote').addEventListener('input',e=>{if(noteEditing){noteEditing.note=e.target.value}});
+$('fNote').addEventListener('blur',()=>{if(noteEditing){if(!noteEditing.note)delete noteEditing.note;noteEditing=null;commit()}});
+$('fNote').addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Escape')e.target.blur()});
+
+/* ---------- værktøjskasse og symboler ---------- */
+const STYLEKEYS=['color','width','dash','fill','size','arrowStart','arrowEnd','showDim','dimKind','ends','label','showName','showDate'];
+let activeKit=null, kitApplying=false, kitEditing=null, pendingSym=null;
+function loadKit(){try{return JSON.parse(localStorage.getItem('bladr:kit')||'[]')||[]}catch{return []}}
+function storeKit(l){try{localStorage.setItem('bladr:kit',JSON.stringify(l));return true}catch{return false}}
+const KITOK=['line','arrow','rect','circle','text','callout','measure','poly','area','stamp'];
+/* Hvilket lag et værktøj skal tegne i: valg for denne PDF, ellers standardlaget, ellers det aktive lag */
+function kitLayerId(k,create){
+  const ov=S.kitLayers&&S.kitLayers[k.id]; if(ov&&S.layers.some(l=>l.id===ov))return ov;
+  if(k.layer){let l=S.layers.find(x=>x.name.toLowerCase()===k.layer.toLowerCase());
+    if(!l&&create){l={id:uid(),name:k.layer,visible:true};S.layers.push(l)} return l?l.id:null}
+  return null;
+}
+function applyKitLayer(k){const lid=kitLayerId(k,true);if(lid){const l=S.layers.find(x=>x.id===lid);l.visible=true;S.active=lid}}
+function renderKit(){
+  const l=loadKit(), box=$('kitList'); box.innerHTML='';
+  $('kitEmpty').hidden=!!l.length;
+  l.forEach((k,i)=>{
+    const d=document.createElement('div');d.className='kititem'+(k.id===activeKit?' act':'');
+    const icon=k.kind==='symbol'?`<img src="${k.src}" alt="">`:`<i style="background:${(k.style&&k.style.color)||'#888'}"></i>`;
+    const ov=S.kitLayers&&S.kitLayers[k.id]&&S.layers.find(x=>x.id===S.kitLayers[k.id]);
+    const layTxt=ov?ov.name+' (denne PDF)':k.layer||'';
+    d.innerHTML=`<button type="button" class="kitpick" title="${esc(NAMES[k.kind]||'')}">${icon}<span>${esc(k.name)}${layTxt?`<small>${esc(layTxt)}</small>`:''}</span>${i<9?`<kbd>${i+1}</kbd>`:''}</button>`+
+      `<button type="button" class="x ed" aria-label="Redigér ${esc(k.name)}" title="Redigér navn og standardlag">${PEN}</button><button type="button" class="x del" aria-label="Slet ${esc(k.name)}">✕</button>`;
+    d.querySelector('.kitpick').onclick=()=>useKit(i);
+    d.querySelector('.ed').onclick=()=>openKitForm(k);
+    d.querySelector('.del').onclick=()=>{const l2=loadKit();l2.splice(i,1);storeKit(l2);if(k.id===activeKit){activeKit=null;if(tool==='symbol')setTool('select')}renderKit()};
+    box.appendChild(d);
+    if(k.id===activeKit&&doc)box.appendChild(kitDetail(k));
+  });
+  const t=propTarget(); $('kitSave').hidden=!(t&&KITOK.includes(t.kind))||!$('kitForm').hidden;
+}
+function kitDetail(k){
+  const d=document.createElement('div'); d.className='kitdetail';
+  const ov=S.kitLayers&&S.kitLayers[k.id], cur=kitLayerId(k,false);
+  d.innerHTML=`<label class="plabel" for="kitLay">Lag i denne PDF</label><select class="sel" id="kitLay" style="max-width:none">
+    <option value="">Standard: ${esc(k.layer||'det aktive lag')}</option>${S.layers.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('')}<option value="__new">+ Nyt lag med navnet "${esc(k.name)}"</option></select>`;
+  const sel=d.querySelector('select'); sel.value=ov&&S.layers.some(l=>l.id===ov)?ov:'';
+  const others=S.annots.filter(a=>a.kit===k.id&&cur&&a.layer!==cur).length;
+  if(others){const b=document.createElement('button');b.type='button';b.className='linkbtn';
+    b.textContent=`Flyt de ${others} eksisterende "${k.name}" i denne PDF til laget "${(S.layers.find(l=>l.id===cur)||{}).name}"`;
+    b.onclick=()=>{pushHist();S.annots.forEach(a=>{if(a.kit===k.id)a.layer=cur});commit();toast(others+' flyttet')};d.appendChild(b)}
+  sel.onchange=()=>{
+    let v=sel.value; S.kitLayers=S.kitLayers||{};
+    if(v==='__new'){pushHist();const l={id:uid(),name:k.name,visible:true};S.layers.push(l);v=l.id}
+    if(v)S.kitLayers[k.id]=v; else delete S.kitLayers[k.id];
+    applyKitLayer(k); commit();
+  };
+  return d;
+}
+function useKit(i){
+  const k=loadKit()[i]; if(!k||!doc)return;
+  kitApplying=true;
+  if(k.kind==='symbol'){setTool('symbol');pendingSym=k}
+  else{setTool(k.kind);Object.assign(defaults[k.kind],k.style);if(k.kind==='text')Object.assign(defaults.callout,k.style);if(k.kind==='callout')Object.assign(defaults.text,k.style)}
+  kitApplying=false;
+  activeKit=k.id; applyKitLayer(k); commit(); autoPanel();
+}
+function openKitForm(k){
+  kitEditing=k||null; $('kitForm').hidden=false; $('kitSave').hidden=true;
+  $('kitFormTitle').textContent=k?'Redigér "'+k.name+'"':'Gem nuværende som værktøj';
+  $('kitName').value=k?k.name:'';
+  if(k)$('kitLayer').value=k.layer||''; else{const t=propTarget(),al=t&&S.layers.find(l=>l.id===(t.a?t.a.layer:S.active));$('kitLayer').value=al&&!/^Lag \d+$/.test(al.name)?al.name:''}
+  $('kitLayerList').innerHTML=S.layers.map(l=>`<option value="${esc(l.name)}">`).join('');
+  $('kitOk').textContent=k?'Gem ændringer':'Gem værktøj';
+  setTimeout(()=>$('kitName').focus(),20);
+}
+$('kitSave').onclick=()=>{if(propTarget())openKitForm(null)};
+$('kitCancel').onclick=()=>{$('kitForm').hidden=true;kitEditing=null;renderKit()};
+$('kitOk').onclick=()=>{
+  const name=$('kitName').value.trim(), layer=$('kitLayer').value.trim(); if(!name){$('kitName').focus();return}
+  const l=loadKit();
+  if(kitEditing){const k=l.find(x=>x.id===kitEditing.id);if(k){k.name=name;k.layer=layer}}
+  else{const t=propTarget();if(!t){$('kitForm').hidden=true;return}
+    const src=t.a||defaults[t.kind], style={}; STYLEKEYS.forEach(k=>{if(src[k]!==undefined)style[k]=src[k]});
+    l.push({id:uid(),name,kind:t.kind,style,layer})}
+  if(!storeKit(l)){toast('Værktøjskassen kunne ikke gemmes i browseren.');return}
+  $('kitForm').hidden=true; toast(kitEditing?'"'+name+'" er opdateret.':'"'+name+'" er gemt i værktøjskassen.'); kitEditing=null;
+  if(activeKit){const k=l.find(x=>x.id===activeKit);if(k){if(k.kind==='symbol')pendingSym=k;applyKitLayer(k)}} commit();
+};
+['kitName','kitLayer'].forEach(id=>$(id).addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();$('kitOk').click()}if(e.key==='Escape')$('kitCancel').click()}));
+
+/* symbol: placering */
+function symSize(k){const w=k.w||48;return {w,h:w/k.ratio}}
+function placeSymbol(p,pt){
+  const k=pendingSym, {w,h}=symSize(k); applyKitLayer(k);
+  addAnnot({type:'symbol',x:pt.x-w/2,y:pt.y-h/2,w,h,src:k.src,name:k.name,kit:k.id},p.n-1,true);
+}
+function rememberSymSize(a){
+  if(!a||a.type!=='symbol'||!a.kit)return; const l=loadKit(),k=l.find(x=>x.id===a.kit); if(!k)return;
+  k.w=Math.round(a.w*10)/10; storeKit(l); if(pendingSym&&pendingSym.id===k.id)pendingSym=k;
+}
+
+/* symbol: nyt fra billede (indsæt, fil eller træk-og-slip) */
+let symSrc=null, symOut=null;
+function openSymbol(file){
+  if(!doc||!file)return;
+  const url=URL.createObjectURL(file), img=new Image();
+  img.onload=()=>{
+    const sc=Math.min(1,900/Math.max(img.width,img.height)), c=document.createElement('canvas');
+    c.width=Math.max(1,Math.round(img.width*sc)); c.height=Math.max(1,Math.round(img.height*sc));
+    c.getContext('2d').drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(url);
+    symSrc=c; $('symName').value=''; $('symLayer').value='';
+    $('symLayerList').innerHTML=S.layers.map(l=>`<option value="${esc(l.name)}">`).join('');
+    $('symBox').hidden=false; processSym(); setTimeout(()=>$('symName').focus(),30);
+  };
+  img.onerror=()=>{URL.revokeObjectURL(url);toast('Billedet kunne ikke åbnes.')};
+  img.src=url;
+}
+function processSym(){
+  if(!symSrc)return;
+  const W=symSrc.width,H=symSrc.height,c=document.createElement('canvas');c.width=W;c.height=H;
+  const x=c.getContext('2d');x.drawImage(symSrc,0,0);const id=x.getImageData(0,0,W,H),d=id.data;
+  const t=+$('symThr').value, hi=255-t*1.4, lo=Math.max(0,hi-70), mono=$('symMono').checked, mc=mono?[...hexRgbA($('symColor').value)]:null;
+  for(let i=0;i<d.length;i+=4){
+    const L=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+    if(t>0)d[i+3]=L>=hi?0:L<=lo?d[i+3]:Math.round(d[i+3]*(hi-L)/(hi-lo));
+    if(mono){d[i]=mc[0];d[i+1]=mc[1];d[i+2]=mc[2]}
+  }
+  x.putImageData(id,0,0);
+  const cr=cropCanvas(c);
+  if(!cr){symOut=null;$('symPrev').innerHTML='<span class="hint">Alt blev fjernet. Skru ned for "Fjern baggrund".</span>';return}
+  const im=new Image(); im.onload=()=>{const s=Math.min(1,600/Math.max(im.width,im.height)),o=document.createElement('canvas');
+    o.width=Math.max(1,Math.round(im.width*s));o.height=Math.max(1,Math.round(im.height*s));o.getContext('2d').drawImage(im,0,0,o.width,o.height);
+    symOut={src:o.toDataURL('image/png'),ratio:o.width/o.height};$('symPrev').innerHTML=`<img src="${symOut.src}" alt="Forhåndsvisning af symbol">`};
+  im.src=cr.src;
+}
+function hexRgbA(h){const n=parseInt(h.slice(1),16);return [n>>16&255,n>>8&255,n&255]}
+['symThr','symMono','symColor'].forEach(id=>$(id).addEventListener('input',processSym));
+$('symMono').addEventListener('change',()=>{$('symColor').disabled=!$('symMono').checked;processSym()});
+$('symFile').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)openSymbol(f)};
+$('kitNewSym').onclick=()=>{if(doc)$('symFile').click()};
+$('symCancel').onclick=()=>{$('symBox').hidden=true;symSrc=null};
+['symName','symLayer'].forEach(id=>$(id).addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();$('symOk').click()}}));
+$('symOk').onclick=()=>{
+  const name=$('symName').value.trim(); if(!name){$('symName').focus();toast('Giv symbolet et navn.');return}
+  if(!symOut){toast('Der er intet tilbage af billedet. Skru ned for "Fjern baggrund".');return}
+  const l=loadKit(), k={id:uid(),name,kind:'symbol',src:symOut.src,ratio:symOut.ratio,layer:$('symLayer').value.trim(),w:48};
+  l.push(k); if(!storeKit(l)){toast('Der er ikke plads til flere symboler i browseren. Slet et par gamle.');return}
+  $('symBox').hidden=true; symSrc=null; useKit(l.length-1);
+  toast('"'+name+'" er gemt. Klik på tegningen for at sætte det ind.',4000);
+};
+document.addEventListener('paste',e=>{
+  if(!doc||typing(e)||!$('sigBox').hidden)return;
+  const it=[...(e.clipboardData&&e.clipboardData.items||[])].find(i=>i.type.startsWith('image/'));
+  if(!it)return; e.preventDefault(); openSymbol(it.getAsFile());
+});
+
+/* ---------- markeringsliste ---------- */
+function describe(a){
+  const c=annCtx(a.page+1), F=v=>C.fmtLen(v,c);
+  switch(a.type){
+    case 'line': return [a.arrowEnd||a.arrowStart?'Pil':'Streg',F(Math.hypot(a.x2-a.x1,a.y2-a.y1))];
+    case 'measure': return ['Mål',(a.label&&a.label.trim())||F(Math.hypot(a.x2-a.x1,a.y2-a.y1))];
+    case 'rect': return [a.dash==='cloud'?'Sky':'Ramme',F(a.w)+' × '+F(a.h)];
+    case 'circle': return ['Cirkel','Ø '+F(2*a.r)];
+    case 'text': return [a.leader?'Tekst med pil':'Tekst',(a.text||'').replace(/\n/g,' ')];
+    case 'poly': return ['Polylinje',F(C.polyLen(a.pts,false))];
+    case 'area': return ['Areal',C.fmtArea(C.polyArea(a.pts),c)+', omkreds '+F(C.polyLen(a.pts,true))];
+    case 'stamp': return ['Stempel',a.label+(a.sub?' ('+a.sub+')':'')];
+    case 'sign': return ['Underskrift',''];
+    case 'symbol': return ['Symbol',a.name||''];
+  } return [a.type,''];
+}
+function listRows(){
+  const fs=$('lfStatus').value, fl=$('lfLayer').value, rows=[], counts={};
+  S.annots.forEach(a=>{
+    if(fl&&a.layer!==fl)return;
+    if(a.type==='count'){const k=a.group+'|'+a.page;(counts[k]=counts[k]||{g:a.group,page:a.page,n:0,layer:a.layer}).n++;return}
+    if(a.type==='symbol'){const k='sym:'+(a.name||'')+'|'+a.page;(counts[k]=counts[k]||{sym:a.name||'Symbol',src:a.src,page:a.page,n:0}).n++;if(!a.status&&!a.note)return}
+    if(fs&&(fs==='none'?a.status:a.status!==fs))return;
+    rows.push(a);
+  });
+  rows.sort((x,y)=>x.page-y.page||(x.created||0)-(y.created||0));
+  return {rows,counts:Object.values(counts).sort((x,y)=>x.page-y.page)};
+}
+function renderList(){
+  if($('paneList').hidden)return;
+  const ll=$('lfLayer'), lv=ll.value; ll.innerHTML='<option value="">Alle lag</option>'+S.layers.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join(''); ll.value=S.layers.some(l=>l.id===lv)?lv:'';
+  const {rows,counts}=listRows(), box=$('lItems'); box.innerHTML='';
+  const st={}; S.annots.forEach(a=>{if(a.type!=='count'&&a.status)st[a.status]=(st[a.status]||0)+1});
+  $('lSum').innerHTML=rows.length+' markering'+(rows.length===1?'':'er')+(Object.keys(st).length?' · '+Object.entries(STATUS).filter(([k])=>st[k]).map(([k,v])=>`<span class="pill s-${k}">${v} ${st[k]}</span>`).join(' '):'');
+  if(!rows.length&&!counts.length){box.innerHTML='<p class="hint">Ingen markeringer'+($('lfStatus').value||$('lfLayer').value?' med det filter':' endnu')+'.</p>'}
+  let lastPage=-1;
+  rows.forEach((a,i)=>{
+    if(a.page!==lastPage){lastPage=a.page;const h=document.createElement('div');h.className='lpage';h.textContent='Side '+(a.page+1);box.appendChild(h)}
+    const [type,desc]=describe(a), lay=S.layers.find(l=>l.id===a.layer);
+    const b=document.createElement('button');b.type='button';b.className='litem'+(a.id===selId?' cur':'');
+    b.innerHTML=`<i style="background:${a.color||'#888'}"></i><span class="lmain"><b>${esc(type)}</b>${desc?' · '+esc(desc.length>70?desc.slice(0,70)+'…':desc):''}${a.note?`<span class="lnote">${esc(a.note)}</span>`:''}<span class="lmeta">${esc(lay?lay.name:'')}${a.author?' · '+esc(a.author):''}</span></span>${a.status?`<span class="pill s-${a.status}">${STATUS[a.status]}</span>`:''}`;
+    b.onclick=()=>{goTo(a.page+1);if(tool!=='select')setTool('select');selId=a.id;renderAllAnn();updProps();autoPanel()};
+    box.appendChild(b);
+  });
+  if(counts.length){
+    const h=document.createElement('div');h.className='lpage';h.textContent='Optælling';box.appendChild(h);
+    counts.forEach(c=>{const g=c.sym?{name:c.sym,color:'#adb5bd'}:S.countGroups.find(x=>x.id===c.g)||{name:'?',color:'#888'};
+      const b=document.createElement('button');b.type='button';b.className='litem';
+      b.innerHTML=`<i style="background:${g.color}"></i><span class="lmain"><b>${esc(g.name)}</b> · ${c.n} stk.<span class="lmeta">Side ${c.page+1}</span></span>`;
+      b.onclick=()=>goTo(c.page+1); box.appendChild(b)});
+  }
+}
+['lfStatus','lfLayer'].forEach(id=>$(id).onchange=renderList);
+function csvCell(v){v=v==null?'':String(v);return /[;"\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}
+$('lExport').onclick=async()=>{
+  if(!doc)return; if(!downloads){toast('Gem af filer er ikke tilgængeligt i denne visning.');return}
+  const {rows,counts}=listRows(), fmtD=t=>t?new Date(t).toLocaleString('da-DK',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+  const lines=[['Nr','Side','Lag','Type','Beskrivelse','Status','Kommentar','Oprettet','Af'].join(';')];
+  rows.forEach((a,i)=>{const [t,d]=describe(a),l=S.layers.find(x=>x.id===a.layer);lines.push([i+1,a.page+1,l?l.name:'',t,d,STATUS[a.status]||'',a.note||'',fmtD(a.created),a.author||''].map(csvCell).join(';'))});
+  if(counts.length){lines.push('');lines.push(['Optælling','Side','Antal'].join(';'));
+    counts.forEach(c=>{const g=c.sym?{name:c.sym}:S.countGroups.find(x=>x.id===c.g);lines.push([g?g.name:'',c.page+1,c.n].map(csvCell).join(';'))});
+    const tot={}; counts.forEach(c=>{const nm=c.sym||(S.countGroups.find(x=>x.id===c.g)||{}).name||'';tot[nm]=(tot[nm]||0)+c.n});
+    Object.entries(tot).forEach(([nm,n])=>lines.push([nm,'I alt',n].map(csvCell).join(';')))}
+  try{await downloads.save({filename:docName.replace(/\.pdf$/i,'').replace(/[\\/:*?"<>|]/g,'-')+' - markeringsliste.csv',data:'﻿'+lines.join('\r\n')});toast('Markeringslisten er gemt')}
+  catch(err){if(!err||err.code!=='declined')toast('Listen kunne ikke gemmes.')}
+};
+
+/* ---------- sammenlign revisioner ---------- */
+let cmpOther=null, cmpResult=null;
+async function openCompare(){
+  if(!doc)return; finishEdit();
+  const files=(await listFiles()).filter(f=>f.key!==docKey);
+  $('cmpFile').innerHTML=files.map(f=>`<option value="${esc(f.key)}">${esc(f.name)}</option>`).join('')+(cmpOther?`<option value="__picked">${esc(cmpOther.name)}</option>`:'')+'<option value="__open">Åbn en anden fil …</option>';
+  if(cmpOther)$('cmpFile').value='__picked';
+  $('cmpPageA').max=doc.numPages; $('cmpPageA').value=cur; $('cmpCloud').disabled=true; $('cmpInfo').textContent='';
+  $('cmpBox').hidden=false;
+}
+$('btnCmp').onclick=openCompare;
+$('cmpClose').onclick=()=>{$('cmpBox').hidden=true};
+$('cmpFile').onchange=e=>{if(e.target.value==='__open')$('cmpIn').click()};
+$('cmpIn').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f){return}
+  cmpOther={name:f.name,bytes:await f.arrayBuffer()};
+  const sel=$('cmpFile'); [...sel.options].filter(o=>o.value==='__picked').forEach(o=>o.remove());
+  const o=document.createElement('option');o.value='__picked';o.textContent=f.name;sel.insertBefore(o,sel.lastElementChild);sel.value='__picked'};
+$('cmpView').onclick=()=>$('cmpView').classList.toggle('zoom');
+async function renderTo(page,sc,W,H){
+  const vp=page.getViewport({scale:sc}), c=document.createElement('canvas'); c.width=W; c.height=H;
+  const x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,W,H);
+  await page.render({canvasContext:x,viewport:vp}).promise; return x.getImageData(0,0,W,H);
+}
+$('cmpRun').onclick=async()=>{
+  const v=$('cmpFile').value; let bytes=null, name='';
+  if(v==='__picked'&&cmpOther){bytes=cmpOther.bytes.slice(0);name=cmpOther.name}
+  else if(v&&v!=='__open'){const f=await tx('files','readonly',s=>s.get(v));if(f){bytes=await f.blob.arrayBuffer();name=f.name}}
+  if(!bytes){toast('Vælg den PDF, der skal sammenlignes med.');return}
+  $('cmpRun').disabled=true; $('cmpInfo').textContent='Sammenligner …';
+  let other=null;
+  try{
+    other=await pdfjsLib.getDocument({data:new Uint8Array(bytes)}).promise;
+    const nA=Math.min(Math.max(1,+$('cmpPageA').value||1),doc.numPages), nB=Math.min(Math.max(1,+$('cmpPageB').value||1),other.numPages);
+    const pa=await doc.getPage(nA), pb=await other.getPage(nB), va=pa.getViewport({scale:1}), vb=pb.getViewport({scale:1});
+    const sc=Math.min(2400/Math.max(va.width,va.height),3), W=Math.ceil(Math.max(va.width,vb.width)*sc), H=Math.ceil(Math.max(va.height,vb.height)*sc);
+    const A=await renderTo(pa,sc,W,H), B=await renderTo(pb,sc,W,H);
+    const openIsNew=$('cmpRole').value==='new', OLD=openIsNew?B.data:A.data, NEW=openIsNew?A.data:B.data;
+    const out=new ImageData(W,H), o=out.data, cell=8, gw=Math.ceil(W/cell), gh=Math.ceil(H/cell), grid=new Uint16Array(gw*gh), thr=70;
+    const lum=(d,i)=>0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+    for(let y=0,i=0;y<H;y++)for(let x=0;x<W;x++,i+=4){
+      const lo=lum(OLD,i), ln=lum(NEW,i), io=lo<255-thr, inn=ln<255-thr;
+      if(io&&inn){const g=Math.min(lo,ln)*0.45+140;o[i]=o[i+1]=o[i+2]=g}
+      else if(io){o[i]=224;o[i+1]=49;o[i+2]=49;grid[(y/cell|0)*gw+(x/cell|0)]++}
+      else if(inn){o[i]=25;o[i+1]=113;o[i+2]=194;grid[(y/cell|0)*gw+(x/cell|0)]++}
+      else{o[i]=o[i+1]=o[i+2]=255}
+      o[i+3]=255;
+    }
+    const cv=$('cmpCanvas'); cv.width=W; cv.height=H; cv.getContext('2d').putImageData(out,0,0);
+    // ændrede områder: markerede celler, udvidet, samlet i komponenter
+    const mark=new Uint8Array(gw*gh); for(let i=0;i<grid.length;i++)if(grid[i]>=4)mark[i]=1;
+    const dil=new Uint8Array(gw*gh), R=2;
+    for(let y=0;y<gh;y++)for(let x=0;x<gw;x++)if(mark[y*gw+x])for(let dy=-R;dy<=R;dy++)for(let dx=-R;dx<=R;dx++){const yy=y+dy,xx=x+dx;if(yy>=0&&yy<gh&&xx>=0&&xx<gw)dil[yy*gw+xx]=1}
+    const seen=new Uint8Array(gw*gh); let boxes=[];
+    for(let s=0;s<gw*gh;s++){if(!dil[s]||seen[s])continue;let x0=1e9,y0=1e9,x1=-1,y1=-1,hits=0;const st=[s];seen[s]=1;
+      while(st.length){const q=st.pop(),qx=q%gw,qy=q/gw|0;if(mark[q])hits++;if(qx<x0)x0=qx;if(qx>x1)x1=qx;if(qy<y0)y0=qy;if(qy>y1)y1=qy;
+        [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy])=>{const nx=qx+dx,ny=qy+dy;if(nx>=0&&nx<gw&&ny>=0&&ny<gh){const n=ny*gw+nx;if(dil[n]&&!seen[n]){seen[n]=1;st.push(n)}}})}
+      if(hits>=2)boxes.push([x0,y0,x1,y1])}
+    let merged=true; while(merged){merged=false;for(let i=0;i<boxes.length&&!merged;i++)for(let j=i+1;j<boxes.length;j++){const a=boxes[i],b=boxes[j];
+      if(a[0]<=b[2]+1&&b[0]<=a[2]+1&&a[1]<=b[3]+1&&b[1]<=a[3]+1){boxes[i]=[Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.max(a[2],b[2]),Math.max(a[3],b[3])];boxes.splice(j,1);merged=true;break}}}
+    const pw=va.width,ph=va.height;
+    cmpResult={page:nA-1,name,boxes:boxes.map(([x0,y0,x1,y1])=>{const X=Math.max(2,x0*cell/sc),Y=Math.max(2,y0*cell/sc);return {x:X,y:Y,w:Math.min(pw-2,(x1+1)*cell/sc)-X,h:Math.min(ph-2,(y1+1)*cell/sc)-Y}}).filter(b=>b.w>2&&b.h>2)};
+    const n=cmpResult.boxes.length;
+    $('cmpInfo').textContent=n?(n===1?'1 ændret område fundet':n+' ændrede områder fundet'):'Ingen forskelle fundet';
+    $('cmpCloud').disabled=!n; $('cmpCloud').textContent='Sæt skyer om ændringerne på side '+nA;
+    if(Math.abs(va.width-vb.width)>2||Math.abs(va.height-vb.height)>2)$('cmpInfo').textContent+=' · sidestørrelserne er forskellige, så resultatet kan være upræcist';
+  }catch(err){$('cmpInfo').textContent='Sammenligningen fejlede: '+(err&&err.message||err)}
+  finally{if(other)other.destroy();$('cmpRun').disabled=false}
+};
+$('cmpCloud').onclick=()=>{
+  if(!cmpResult)return; pushHist();
+  const nm='Ændringer', l=S.layers.find(x=>x.name===nm)||(S.layers.push({id:uid(),name:nm,visible:true}),S.layers[S.layers.length-1]); l.visible=true;
+  cmpResult.boxes.forEach(b=>S.annots.push(meta({id:uid(),layer:l.id,page:cmpResult.page,type:'rect',x:b.x,y:b.y,w:b.w,h:b.h,color:'#e03131',width:1.2,dash:'cloud',fill:'none',status:'open',note:'Fundet ved sammenligning med '+cmpResult.name})));
+  const n=cmpResult.boxes.length, pg=cmpResult.page; cmpResult=null; $('cmpBox').hidden=true; commit(); goTo(pg+1);
+  toast(n+' sky'+(n===1?'':'er')+' lagt i laget "Ændringer". De står som åbne i markeringslisten.',4500);
+};
+
+/* ---------- eksport ---------- */
+let downloads=null;
+(async()=>{try{downloads=window.bladrDownloads||await (window.claude&&window.claude.use?window.claude.use('downloads'):null)}catch{downloads=null}})();
+/* udskriv (kun i den installerede app, hvor browseren må åbne udskriftsdialogen) */
+if(window.bladrPrint){
+  $('btnPrint').hidden=false;
+  $('btnPrint').onclick=async()=>{
+    if(!doc)return; finishEdit(); toast('Forbereder udskrift …');
+    let bytes=origBytes.slice(0);
+    if(!encrypted){try{bytes=await C.buildPdf(PDFLib,origBytes.slice(0),{mode:'flat',layers:S.layers.filter(l=>l.visible),
+      annotsFor:(i,lid)=>S.annots.filter(a=>a.page===i&&a.layer===lid&&!(a.type==='text'&&!a.text.trim())),
+      pageInfo:i=>({transform:sizes[i].t,scale:pageScale(i),unit:S.unit,paperUnit:S.paperUnit,dec:S.dec,groups:S.countGroups})})}catch(e){}}
+    window.bladrPrint(bytes);
+  };
+}
+$('btnExport').onclick=()=>{
+  if(!doc)return; finishEdit();
+  $('expLayers').innerHTML=S.layers.map(l=>{const n=S.annots.filter(a=>a.layer===l.id).length;return `<label class="opt"><input type="checkbox" value="${l.id}" ${l.visible&&n?'checked':''} ${n?'':'disabled'}><span>${esc(l.name)} <small style="display:inline">· ${n}</small></span></label>`}).join('');
+  $('expMsg').textContent=encrypted?'Beskyttede PDF\'er kan ikke eksporteres med markeringer.':(downloads?'':'Gem af filer er ikke tilgængeligt i denne visning. Åbn siden i claude.ai for at eksportere.');
+  const hasSig=S.annots.some(a=>a.type==='sign');
+  $('expSigNote').hidden=!hasSig; if(hasSig)document.querySelector('input[name="expMode"][value="flat"]').checked=true;
+  $('expGo').disabled=encrypted||!downloads;
+  $('expBox').hidden=false;
+};
+$('expCancel').onclick=()=>$('expBox').hidden=true;
+$('expForm').onsubmit=async e=>{
+  e.preventDefault();
+  const mode=document.querySelector('input[name="expMode"]:checked').value;
+  const ids=[...$('expLayers').querySelectorAll('input:checked')].map(i=>i.value);
+  const layers=S.layers.filter(l=>ids.includes(l.id));
+  if(!layers.length&&(mode==='ocg'||mode==='sep')){$('expMsg').textContent='Vælg mindst ét lag med markeringer.';return}
+  $('expGo').disabled=true;$('expMsg').textContent='Bygger PDF …';
+  const stem=docName.replace(/\.pdf$/i,'');
+  let info={};
+  const build=(ls,m)=>C.buildPdf(PDFLib,origBytes.slice(0),{mode:m,layers:ls,info,flattenForm:m!=='ocg',
+    annotsFor:(i,lid)=>S.annots.filter(a=>a.page===i&&a.layer===lid&&!(a.type==='text'&&!a.text.trim())),
+    pageInfo:i=>({transform:sizes[i].t,scale:pageScale(i),unit:S.unit,paperUnit:S.paperUnit,dec:S.dec,groups:S.countGroups})});
+  try{
+    const jobs = mode==='sep' ? layers.map(l=>({ls:[l],name:stem+' - '+l.name+'.pdf',m:'flat'}))
+      : mode==='img' ? [{ls:layers,name:stem+' - låst.pdf',m:'flat',img:true}]
+      : [{ls:layers,name:stem+(S.annots.some(a=>a.type==='sign')?' - underskrevet.pdf':' - markeret.pdf'),m:mode}];
+    for(let j=0;j<jobs.length;j++){
+      const job=jobs[j]; if(jobs.length>1)$('expMsg').textContent=`Fil ${j+1} af ${jobs.length}: ${job.name}`;
+      let bytes=await build(job.ls,job.m);
+      if(info.error&&!job.img){$('expMsg').textContent='Formularfelterne kunne ikke låses ('+info.error+'). Vælg "Låst billedkopi" for at låse dem.';$('expGo').disabled=false;return}
+      if(job.img) bytes=await C.rasterizePdf(pdfjsLib,PDFLib,bytes,{onProgress:(i,n)=>{$('expMsg').textContent=`Laver billedkopi: side ${i} af ${n} …`}});
+      try{await downloads.save({filename:job.name.replace(/[\\/:*?"<>|]/g,'-'),data:new Blob([bytes])})}
+      catch(err){ if(err&&err.code==='declined'){ $('expMsg').textContent='Gemning annulleret.'; $('expGo').disabled=false; return }
+        if(err&&err.code==='rate_limited'){ await new Promise(r=>setTimeout(r,1500)); j--; continue }
+        throw err }
+    }
+    $('expBox').hidden=true; toast((jobs.length>1?jobs.length+' filer gemt':'PDF gemt')+(info.fields?` · ${info.fields} formularfelt${info.fields===1?'':'er'} låst`:''),4000);
+  }catch(err){ $('expMsg').textContent='Eksporten fejlede: '+(err&&err.message?err.message:err); }
+  $('expGo').disabled=false;
+};
+
+/* ---------- miniaturer ---------- */
+const tio=new IntersectionObserver(ents=>{for(const e of ents){if(e.isIntersecting&&!e.target.dataset.done){e.target.dataset.done=1;renderThumb(+e.target.dataset.n,e.target)}}},{root:$('panePages'),rootMargin:'300px'});
+function buildThumbs(){
+  const box=$('thumbs');box.innerHTML='';
+  for(let i=1;i<=doc.numPages;i++){
+    const {w,h}=sizes[i-1],tw=120,th=Math.round(tw*h/w);
+    const b=document.createElement('button');b.className='thumb';b.dataset.n=i;
+    b.innerHTML=`<span class="t" style="width:${tw}px;height:${th}px"></span>${i}`;
+    b.onclick=()=>{goTo(i);closeSideSm()};
+    box.appendChild(b);const t=b.querySelector('.t');t.dataset.n=i;tio.observe(t);
+  }
+}
+async function renderThumb(n,holder){
+  const my=gen;const page=await doc.getPage(n);if(my!==gen)return;
+  const v1=page.getViewport({scale:1});const vp=page.getViewport({scale:(120/v1.width)*2});
+  const c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;
+  try{await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise}catch{return}
+  if(my===gen){holder.innerHTML='';holder.appendChild(c)}
+}
+
+/* ---------- navigation ---------- */
+function goTo(n,smooth=true){
+  if(!pages.length)return; n=Math.max(1,Math.min(pages.length,n));
+  viewer.scrollTo({top:pages[n-1].el.offsetTop-16,behavior:smooth&&!matchMedia('(prefers-reduced-motion:reduce)').matches?'smooth':'auto'});
+  setCur(n);
+}
+function setCur(n){
+  if(n===cur&&$('pageIn').value==String(n))return;
+  cur=n;$('pageIn').value=n;
+  document.querySelectorAll('.thumb').forEach(t=>t.classList.toggle('cur',+t.dataset.n===n));
+  if(docKey)store.set('bladr:page:'+docKey,n);
+  $('btnPrev').disabled=n<=1;$('btnNext').disabled=n>=pages.length;
+  updScaleBtn(); updIns(); updGeo();
+}
+viewer.addEventListener('scroll',()=>{
+  if(!pages.length)return;
+  const mid=viewer.scrollTop+viewer.clientHeight*0.35; let n=1;
+  for(const p of pages){if(p.el.offsetTop<=mid)n=p.n;else break}
+  setCur(n);
+},{passive:true});
+function setZoom(newFit,newScale){
+  if(!pages.length){fit=newFit;return}
+  const pe=pages[cur-1].el, frac=(viewer.scrollTop-pe.offsetTop)/pe.offsetHeight, keep=cur;
+  fit=newFit; if(newScale)scale=Math.max(.25,Math.min(6,newScale));
+  layout();
+  viewer.scrollTop=pages[keep-1].el.offsetTop+frac*pages[keep-1].el.offsetHeight;
+}
+function updateZoomUI(){
+  $('zoomVal').textContent=Math.round(scale*100)+'%';
+  $('btnFitW').setAttribute('aria-pressed',fit==='width');$('btnFitP').setAttribute('aria-pressed',fit==='page');
+}
+const steps=[.25,.33,.5,.67,.75,.9,1,1.1,1.25,1.5,1.75,2,2.5,3,4,5,6];
+const zoomIn=()=>setZoom('custom',steps.find(s=>s>scale+.01)||6);
+const zoomOut=()=>setZoom('custom',[...steps].reverse().find(s=>s<scale-.01)||.25);
+viewer.addEventListener('wheel',e=>{if(e.ctrlKey&&doc){e.preventDefault();e.deltaY<0?zoomIn():zoomOut()}},{passive:false});
+
+/* ---------- søgning ---------- */
+async function getTexts(){
+  if(pageTexts)return pageTexts; const my=gen; const out=[];
+  for(let i=1;i<=doc.numPages;i++){const pg=await doc.getPage(i);const tc=await pg.getTextContent();if(my!==gen)return null;out.push(tc.items.map(t=>t.str+(t.hasEOL?' ':'')).join(''))}
+  return pageTexts=out;
+}
+let searchT;
+async function runSearch(){
+  const q=query.trim(); pages.forEach(markHits);
+  const res=$('results'),st=$('findStatus');res.innerHTML='';
+  if(!q){st.textContent='Skriv i søgefeltet for at søge.';return}
+  if(!doc){st.textContent='Åbn et dokument først.';return}
+  st.textContent='Søger …';
+  const texts=await getTexts(); if(!texts||q!==query.trim())return;
+  let total=0; const ql=q.toLowerCase();
+  texts.forEach((t,i)=>{
+    const tl=t.toLowerCase(); let idx=tl.indexOf(ql), count=0, firstIdx=idx;
+    while(idx>-1){count++;idx=tl.indexOf(ql,idx+ql.length)}
+    if(!count)return; total+=count;
+    const a=Math.max(0,firstIdx-40), snip=(a?'…':'')+esc(t.slice(a,firstIdx))+'<mark>'+esc(t.substr(firstIdx,q.length))+'</mark>'+esc(t.slice(firstIdx+q.length,firstIdx+q.length+60))+'…';
+    const b=document.createElement('button');b.className='res';b.dataset.p=i+1;
+    b.innerHTML=`<b>Side ${i+1}${count>1?' · '+count+' fund':''}</b><span>${snip}</span>`;
+    b.onclick=()=>{goTo(i+1);closeSideSm()};res.appendChild(b);
+  });
+  st.textContent=total?`${total} fund på ${res.children.length} ${res.children.length===1?'side':'sider'}`:'Ingen fund for “'+q+'”.';
+}
+$('q').addEventListener('input',()=>{query=$('q').value;clearTimeout(searchT);searchT=setTimeout(runSearch,220)});
+$('q').addEventListener('keydown',async e=>{
+  if(e.key==='Enter'){e.preventDefault();query=$('q').value;await runSearch();showTab('Find');openSide();
+    const ps=[...$('results').children].map(b=>+b.dataset.p);const next=ps.find(n=>n>cur)||ps[0];if(next)goTo(next)}
+  if(e.key==='Escape'){$('q').value='';query='';runSearch();$('q').blur()}
+});
+
+/* ---------- sidepanel ---------- */
+const TABS=['Tool','Files','Pages','Layers','List','Find'];
+let curTab='Files';
+function showTab(name,auto){for(const t of TABS){$('tab'+t).setAttribute('aria-selected',t===name);$('pane'+t).hidden=t!==name}
+  curTab=name; if(!auto&&name!=='Tool')store.set('bladr:tab',name);
+  if(name==='Pages'){const c=document.querySelector('.thumb.cur');if(c)c.scrollIntoView({block:'nearest'})}
+  if(name==='List')renderList();}
+TABS.forEach(t=>$('tab'+t).onclick=()=>{if(autoPrev){autoPrev=null;if(app.classList.contains('peek')){app.classList.remove('peek','noside');$('btnSide').setAttribute('aria-pressed','true')}}showTab(t)});
+const small=()=>matchMedia('(max-width:820px)').matches;
+function openSide(){if(app.classList.contains('noside'))toggleSide()}
+function toggleSide(){if(app.classList.contains('peek')){app.classList.remove('peek');autoPrev=null;$('btnSide').setAttribute('aria-pressed','false');return}app.classList.toggle('noside');const on=!app.classList.contains('noside');$('btnSide').setAttribute('aria-pressed',on);if(!small())store.set('bladr:side',on?'1':'0')}
+function closeSideSm(){if(small()&&!app.classList.contains('noside'))toggleSide()}
+$('btnSide').onclick=toggleSide;
+matchMedia('(max-width:820px)').addEventListener('change',m=>{if(m.matches){app.classList.remove('peek');app.classList.add('noside');autoPrev=null;$('btnSide').setAttribute('aria-pressed','false')}});
+
+/* ---------- knapper og taster ---------- */
+$('btnOpen').onclick=()=>$('fileIn').click();
+$('fileIn').onchange=e=>{if(e.target.files.length)openFiles(e.target.files);e.target.value=''};
+$('btnPrev').onclick=()=>goTo(cur-1);$('btnNext').onclick=()=>goTo(cur+1);
+$('pageIn').addEventListener('change',()=>goTo(parseInt($('pageIn').value,10)||1));
+$('pageIn').addEventListener('keydown',e=>{if(e.key==='Enter'){goTo(parseInt($('pageIn').value,10)||1);$('pageIn').blur()}});
+$('btnIn').onclick=zoomIn;$('btnOut').onclick=zoomOut;
+$('btnFitW').onclick=()=>setZoom('width');$('btnFitP').onclick=()=>setZoom('page');
+$('btnRot').onclick=()=>{finishEdit();rot=(rot+90)%360;if(doc)setZoom(fit)};
+$('btnUndo').onclick=undo;$('btnRedo').onclick=redo;
+const KEYTOOLS={v:'select',l:'line',a:'arrow',r:'rect',o:'circle',t:'text',c:'callout',m:'measure',p:'poly',f:'area',k:'count',s:'stamp'};
+document.addEventListener('keydown',e=>{
+  if(!$('scaleBox').hidden||!$('expBox').hidden||!$('setBox').hidden||!$('sigBox').hidden){if(e.key==='Escape'){$('scaleBox').hidden=true;$('expBox').hidden=true;$('setBox').hidden=true;$('sigBox').hidden=true;calib=null}return}
+  if(!$('cmpBox').hidden){if(e.key==='Escape')$('cmpBox').hidden=true;return}
+  if(!$('symBox').hidden){if(e.key==='Escape')$('symCancel').click();return}
+  if(e.key==='Escape'&&typing(e)&&e.target.closest('#paneTool')){e.target.blur();goHome();return}
+  if(typing(e))return;
+  if(polyDraw){
+    if(e.key==='Enter'){e.preventDefault();finishPoly();return}
+    if(e.key==='Backspace'){e.preventDefault();polyDraw.pts.splice(-2,2);if(!polyDraw.pts.length)cancelPoly();else renderAnn(polyDraw.p);return}
+    if(e.key==='Escape'){e.preventDefault();const need=tool==='area'?6:4;if(polyDraw.pts.length>=need)finishPoly();else cancelPoly();return}
+  }
+  if(tool==='count'&&!selId&&(e.key==='Backspace'||e.key==='Delete')&&countStack.length){e.preventDefault();const id=countStack.pop();if(S.annots.some(a=>a.id===id)){pushHist();S.annots=S.annots.filter(a=>a.id!==id);commit()}return}
+  if(/^[1-9]$/.test(e.key)&&!e.ctrlKey&&!e.metaKey&&!e.altKey){const i=+e.key-1;if(loadKit()[i]){e.preventDefault();useKit(i)}return}
+  const k=e.key.toLowerCase(), mod=e.ctrlKey||e.metaKey;
+  if(mod&&k==='z'){e.preventDefault();e.shiftKey?redo():undo();return}
+  if(mod&&k==='y'){e.preventDefault();redo();return}
+  if(mod&&k==='f'){e.preventDefault();$('q').focus();$('q').select();return}
+  if(mod&&k==='o'){e.preventDefault();$('fileIn').click();return}
+  if(mod&&k==='p'&&window.bladrPrint){e.preventDefault();$('btnPrint').click();return}
+  if(mod||e.altKey)return;
+  if(k==='u'){openSig();return}
+  if(KEYTOOLS[k]){setTool(KEYTOOLS[k]);return}
+  if(e.key==='Escape'){goHome();return}
+  if((e.key==='Delete'||e.key==='Backspace')&&selId){e.preventDefault();delSel();return}
+  if(e.key==='Enter'&&selId){const a=S.annots.find(x=>x.id===selId);if(a){e.preventDefault();editRequest(a)}return}
+  if(e.key==='/'){e.preventDefault();$('q').focus()}
+  else if(e.key==='ArrowRight'){e.preventDefault();goTo(cur+1)}
+  else if(e.key==='ArrowLeft'){e.preventDefault();goTo(cur-1)}
+  else if(e.key==='+'||e.key==='='){zoomIn()}
+  else if(e.key==='-'){zoomOut()}
+  else if(e.key==='Home'){e.preventDefault();goTo(1)}
+  else if(e.key==='End'){e.preventDefault();goTo(pages.length)}
+});
+viewer.addEventListener('pointerdown',e=>{if(drag||editingId||e.button>0)return;if(tool==='select'&&(selId||autoPrev)&&!e.target.closest('[data-id],[data-h]')&&!e.target.closest('.editor'))goHome()});
+let rsT;new ResizeObserver(()=>{clearTimeout(rsT);rsT=setTimeout(()=>{if(doc&&fit!=='custom')setZoom(fit)},120)}).observe(viewer);
+
+/* ---------- træk og slip ---------- */
+let dragN=0;
+addEventListener('dragenter',e=>{if([...e.dataTransfer.types].includes('Files')){dragN++;$('drop').hidden=false}});
+addEventListener('dragleave',()=>{if(--dragN<=0){dragN=0;$('drop').hidden=true}});
+addEventListener('dragover',e=>e.preventDefault());
+addEventListener('drop',e=>{e.preventDefault();dragN=0;$('drop').hidden=true;const fs=[...e.dataTransfer.files];if(!fs.length)return;const img=fs.find(f=>f.type.startsWith('image/'));if(img&&!fs.some(f=>/pdf/i.test(f.type)||/\.pdf$/i.test(f.name))){openSymbol(img);return}openFiles(e.dataTransfer.files)});
+
+/* ---------- eksempel ---------- */
+function sampleState(){
+  const s=freshState(); s.layers=[{id:'l1',name:'Tilsyn',visible:true},{id:'l2',name:'Mål',visible:true}]; s.active='l1'; s.scales.all=100*RATIO_K;
+  s.annots=[
+    {id:'s1',layer:'l1',page:1,type:'rect',x:44,y:226,w:336,h:21,color:'#e03131',width:1.5,dash:'cloud',fill:'none'},
+    {id:'s2',layer:'l1',page:1,type:'text',x:410,y:160,text:'Kontrollér Isc igen\nved næste service',size:10,color:'#e03131',width:1,dash:'solid',fill:'white',leader:{x:384,y:236}},
+    {id:'s3',layer:'l2',page:1,type:'measure',x1:50,y1:360,x2:300,y2:360,color:'#1c7ed6',width:1,size:10,ends:'arrow',label:''},
+    {id:'s4',layer:'l2',page:1,type:'circle',cx:440,cy:430,r:42.52,color:'#1c7ed6',width:1.5,dash:'dash',fill:'none',showDim:true,dimKind:'d',size:10},
+  ];
+  return s;
+}
+
+window.bladrOpenFiles=openFiles;
+/* ---------- start ---------- */
+(async()=>{
+  if(!small()&&store.get('bladr:side')!=='0'){app.classList.remove('noside');$('btnSide').setAttribute('aria-pressed','true')}
+  showTab(TABS.includes(store.get('bladr:tab'))?store.get('bladr:tab'):'Files');
+  setTool('select'); updUndo();
+  idb=await openDB(); await renderFiles();
+  const all=await listFiles();
+  if(all.length){const f=all[0];openBuffer(await f.blob.arrayBuffer(),f.name,f.key)}
+  else{const bin=atob(SAMPLE);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);openBuffer(u.buffer,'Eksempel – Velkommen til Bladr.pdf','sample',sampleState())}
+})();
+})();
+</script>
+
+<div class="updbar" id="updBar" hidden role="status">Der er en ny version af Bladr klar. <button type="button" id="updGo">Genstart nu</button></div>
+</body>
+</html>
