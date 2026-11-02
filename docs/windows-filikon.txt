@@ -9,6 +9,7 @@ $ico = Join-Path $dir 'file-pdf.ico'
 Invoke-WebRequest 'https://marti680.github.io/Bladr/icons/file-pdf.ico' -OutFile $ico -UseBasicParsing
 
 $fixed = 0
+$ok = 0
 Get-ChildItem 'HKCU:\Software\Classes' -ErrorAction SilentlyContinue |
   Where-Object { $_.PSChildName -like 'Chrome.*' -or $_.PSChildName -like 'MSEdge*' } |
   ForEach-Object {
@@ -23,8 +24,10 @@ Get-ChildItem 'HKCU:\Software\Classes' -ErrorAction SilentlyContinue |
       Set-ItemProperty -Path "$p\DefaultIcon" -Name '(default)' -Value "$ico,0"
       Write-Host "Ikon sat for $($_.PSChildName)"
       $fixed++
-    }
+    } elseif ($file -eq $ico) { $ok++ }
   }
 
-if ($fixed -eq 0) { Write-Host 'Fandt ingen Bladr-registrering uden ikon. Er Bladr installeret og valgt som PDF-program?' }
-else { ie4uinit.exe -show; Write-Host 'Faerdig. Genstart Stifinder eller computeren, hvis ikonerne ikke skifter med det samme.' }
+if ($fixed -eq 0 -and $ok -eq 0) { Write-Host 'Fandt ingen Bladr-registrering at rette. Er Bladr installeret og valgt som PDF-program?'; return }
+if ($ok -gt 0) { Write-Host 'Ikonfilen er opdateret til den nyeste udgave.' }
+ie4uinit.exe -show
+Write-Host 'Faerdig. Genstart Stifinder eller computeren, hvis ikonerne ikke skifter med det samme.'
