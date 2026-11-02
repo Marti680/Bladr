@@ -17,6 +17,16 @@ En PDF-læser med markering, mål, lag, optælling, stempler og underskrift. Bla
 
 Du kan også gå til *Indstillinger → Apps → Standardapps*, søge efter `.pdf` og vælge Bladr.
 
+### Blanke PDF-ikoner i Stifinder
+
+Chrome glemmer at give PDF-filtypen et ikon, når Bladr er standardprogram, så filerne vises som blanke sider. Ret det ved at åbne **Windows PowerShell** og køre:
+
+```powershell
+irm https://marti680.github.io/Bladr/windows-filikon.txt | iex
+```
+
+Scriptet ([se indholdet](docs/windows-filikon.txt)) henter Bladrs filikon og sætter det på Bladrs PDF-registrering for din egen bruger. Kør det igen, hvis ikonerne bliver blanke efter en Chrome-opdatering.
+
 ## Opdateringer
 
 Når der kommer en ny version, viser Bladr en besked øverst: *"Der er en ny version af Bladr klar"*. Tryk **Genstart nu**. Du skal ikke installere noget igen.
