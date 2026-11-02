@@ -28,13 +28,22 @@ async def main():
             await pg.set_content(page(size, mask))
             await pg.screenshot(path=os.path.join(OUT, name), omit_background=True)
             await pg.close()
-        fsvg = open(os.path.join(ROOT, 'src', 'file-icon.svg'), encoding='utf-8').read()
-        for size in (256, 48):
+        # Filikon til PDF'er i Stifinder: selve logoet, så det er tydeligt i små størrelser
+        pngs = {}
+        for size in (16, 24, 32, 48, 64, 128, 256):
             pg = await b.new_page(viewport={'width': size, 'height': size})
-            await pg.set_content('<html><body style="margin:0;background:transparent">' + fsvg.replace('<svg ', f'<svg width="{size}" height="{size}" ', 1) + '</body></html>')
-            await pg.screenshot(path=os.path.join(OUT, f'file-pdf-{size}.png'), omit_background=True)
+            await pg.set_content(page(size, False))
+            path = os.path.join(OUT, f'file-pdf-{size}.png')
+            await pg.screenshot(path=path, omit_background=True)
+            pngs[size] = path
             await pg.close()
         await b.close()
+    from PIL import Image
+    imgs = {k: Image.open(v).convert('RGBA') for k, v in pngs.items()}
+    imgs[256].save(os.path.join(OUT, 'file-pdf.ico'), format='ICO', sizes=[(k, k) for k in sorted(imgs)],
+                   append_images=[imgs[k] for k in sorted(imgs) if k != 256])
+    for k, v in pngs.items():  # kun 48 og 256 bruges i manifestet
+        if k not in (48, 256): os.remove(v)
     print('Ikoner gemt i', OUT)
 
 asyncio.run(main())
