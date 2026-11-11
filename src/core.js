@@ -27,13 +27,15 @@ function arrowHead(sx, sy, tx, ty, w){
   const bx = tx - ux*L, by = ty - uy*L;
   return [['M',tx,ty],['L',bx - uy*hw, by + ux*hw],['L',bx + uy*hw, by - ux*hw],['Z']];
 }
-function cloudOps(x, y, w, h, width){
-  const d = 10 + 2*width, ops = [['M',x,y]];
-  const pts = [[x,y],[x+w,y],[x+w,y+h],[x,y+h]];
-  for(let e=0;e<4;e++){
-    const [ax,ay] = pts[e], [bx,by] = pts[(e+1)%4];
+/* Sky langs en lukket polygon: buerne vender altid udad, uanset tegneretning */
+function cloudPoly(pts, width){
+  const d = 10 + 2*width, n0 = pts.length, ops = [['M',pts[0][0],pts[0][1]]];
+  let sa = 0; for(let i=0;i<n0;i++){ const a=pts[i], b=pts[(i+1)%n0]; sa += a[0]*b[1]-b[0]*a[1]; }
+  const sg = sa >= 0 ? 1 : -1;
+  for(let e=0;e<n0;e++){
+    const [ax,ay] = pts[e], [bx,by] = pts[(e+1)%n0];
     const len = Math.hypot(bx-ax, by-ay); if(len < 0.5) continue;
-    const n = Math.max(1, Math.round(len/d)), ux = (bx-ax)/len, uy = (by-ay)/len, nx = uy, ny = -ux, seg = len/n, r = seg/2;
+    const n = Math.max(1, Math.round(len/d)), ux = (bx-ax)/len, uy = (by-ay)/len, nx = uy*sg, ny = -ux*sg, seg = len/n, r = seg/2;
     for(let i=0;i<n;i++){
       const px = ax+ux*seg*i, py = ay+uy*seg*i, qx = px+ux*seg, qy = py+uy*seg, tx = px+ux*r+nx*r, ty = py+uy*r+ny*r;
       ops.push(['C', px+nx*r*K, py+ny*r*K, tx-ux*r*K, ty-uy*r*K, tx, ty]);
@@ -42,6 +44,8 @@ function cloudOps(x, y, w, h, width){
   }
   ops.push(['Z']); return ops;
 }
+function cloudOps(x, y, w, h, width){ return cloudPoly([[x,y],[x+w,y],[x+w,y+h],[x,y+h]], width); }
+const pairs = p => { const r=[]; for(let i=0;i<p.length;i+=2) r.push([p[i],p[i+1]]); return r; };
 function rectOps(x,y,w,h){ return [['M',x,y],['L',x+w,y],['L',x+w,y+h],['L',x,y+h],['Z']]; }
 function circleOps(cx,cy,r){ const k=r*K; return [['M',cx+r,cy],['C',cx+r,cy+k,cx+k,cy+r,cx,cy+r],['C',cx-k,cy+r,cx-r,cy+k,cx-r,cy],['C',cx-r,cy-k,cx-k,cy-r,cx,cy-r],['C',cx+k,cy-r,cx+r,cy-k,cx+r,cy],['Z']]; }
 function cloudCircleOps(cx,cy,r,width){
@@ -86,9 +90,13 @@ function dimLabels(a, ctx){
     const x1=p[2*n-4], y1=p[2*n-3], x2=p[2*n-2], y2=p[2*n-1], d=Math.hypot(x2-x1,y2-y1)||1, ux=(x2-x1)/d, uy=(y2-y1)/d;
     const str = 'L = ' + F(polyLen(p,false)), tw = measureFn(str, s) + 6, rot = normRot(Math.atan2(uy,ux)), o = off(a.lo);
     L.push({key:'lo', str, x:x2+ux*(tw/2+6)+o.x, y:y2+uy*(tw/2+6)+o.y+(Math.abs(uy)>0.9?0:0), rot, size:s});
-  } else if(a.type==='area' && a.pts && a.pts.length >= 6){
-    const c = centroid(a.pts), o = off(a.lo);
-    L.push({key:'lo', str:'A = '+fmtArea(polyArea(a.pts), ctx)+'\nO = '+F(polyLen(a.pts,true)), x:c[0]+o.x, y:c[1]+o.y, rot:0, size:s});
+  } else if(a.type==='area' && a.pts && a.pts.length >= 6 && a.showDim !== false){
+    const c = centroid(a.pts), o = off(a.lo), net = areaNet(a), lines = ['A = '+fmtArea(net, ctx)+((a.holes&&a.holes.length)?' (netto)':''), 'O = '+F(polyLen(a.pts,true))];
+    const v = volumeM3(a, ctx); if(v != null) lines.push('V = '+(a.vdir==='cut'?'-':'+')+fmtNum(v, ctx&&ctx.dec&&ctx.dec!=='auto'?+ctx.dec:2)+' m³ '+(a.vdir==='cut'?'udgravning':'opbygning'));
+    L.push({key:'lo', str:lines.join('\n'), x:c[0]+o.x, y:c[1]+o.y, rot:0, size:s});
+  } else if(a.type==='angle' && a.pts && a.pts.length === 6){
+    const g = angleGeom(a), o = off(a.lo);
+    L.push({key:'lo', str:fmtNum(g.deg,1)+'°', x:g.vx+g.bx*(g.r+s*1.3)+o.x, y:g.vy+g.by*(g.r+s*1.3)+o.y, rot:0, size:s});
   } else if(a.type==='circle' && a.showDim){
     const g = s*0.65 + 3, o = off(a.lo);
     if(a.dimKind==='r') L.push({key:'lo', str:'R '+F(a.r), x:a.cx+a.r/2+o.x, y:a.cy-g+o.y, rot:0, size:s});
@@ -124,6 +132,16 @@ function fmtArea(pt2, ctx){
   if(u==='cm') return f(m2*1e4, d ?? 0) + ' cm²';
   return f(m2, d ?? 2) + ' m²';
 }
+function fmtNum(v, p){ return v.toLocaleString('da-DK',{minimumFractionDigits:p,maximumFractionDigits:p}); }
+function areaNet(a){ let s = polyArea(a.pts); (a.holes||[]).forEach(h => { if(h.length>=6) s -= polyArea(h); }); return Math.max(0, s); }
+/* Rumfang i m³: nettoareal × højde/dybde (a.depth i meter). Kræver skala. */
+function volumeM3(a, ctx){ if(!a.vdir || !(a.depth > 0) || !(ctx && ctx.scale)) return null; return areaNet(a)*ctx.scale*ctx.scale*a.depth; }
+function angleGeom(a){
+  const [x1,y1,vx,vy,x2,y2] = a.pts, a1 = Math.atan2(y1-vy,x1-vx), a2 = Math.atan2(y2-vy,x2-vx);
+  let d = a2-a1; while(d > Math.PI) d -= 2*Math.PI; while(d <= -Math.PI) d += 2*Math.PI;
+  const l1 = Math.hypot(x1-vx,y1-vy), l2 = Math.hypot(x2-vx,y2-vy), r = Math.max(6, Math.min(28, 0.45*Math.min(l1,l2))), m = a1+d/2;
+  return {vx, vy, a1, d, r, deg:Math.abs(d)*180/Math.PI, bx:Math.cos(m), by:Math.sin(m)};
+}
 function fillOf(a, col){ return a.fill==='tint' ? {fill:col, op:0.2} : {fill:FILLS[a.fill]||null, op:1}; }
 function stampBox(a){
   const s=a.size||14, pad=s*0.45, ss=s*0.56, lw=measureFn(a.label||'', s, true), sw=a.sub ? measureFn(a.sub, ss) : 0;
@@ -155,7 +173,7 @@ function bbox(a){
   if(a.type==='sign'||a.type==='symbol') return {x:a.x,y:a.y,w:a.w,h:a.h};
   if(a.type==='stamp'){ const b=stampBox(a); return {x:b.x,y:b.y,w:b.w,h:b.h}; }
   if(a.type==='count'){ const r=(a.size||9)/2*1.3; return {x:a.x-r,y:a.y-r,w:2*r,h:2*r}; }
-  if(a.type==='poly'||a.type==='area'){ const p=a.pts||[0,0]; let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; for(let i=0;i<p.length;i+=2){x0=Math.min(x0,p[i]);x1=Math.max(x1,p[i]);y0=Math.min(y0,p[i+1]);y1=Math.max(y1,p[i+1]);} return {x:x0,y:y0,w:x1-x0,h:y1-y0}; }
+  if(a.type==='poly'||a.type==='area'||a.type==='angle'){ const p=a.pts||[0,0]; let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; for(let i=0;i<p.length;i+=2){x0=Math.min(x0,p[i]);x1=Math.max(x1,p[i]);y0=Math.min(y0,p[i+1]);y1=Math.max(y1,p[i+1]);} return {x:x0,y:y0,w:x1-x0,h:y1-y0}; }
   return textBox(a);
 }
 
@@ -204,9 +222,22 @@ function prims(a, ctx){
   }
   else if(a.type === 'poly' || a.type === 'area'){
     const p = a.pts||[], closed = a.type==='area'; if(p.length >= 4){
-      const ops = [['M',p[0],p[1]]]; for(let i=2;i<p.length;i+=2) ops.push(['L',p[i],p[i+1]]); if(closed) ops.push(['Z']);
+      let ops;
+      if(closed && a.dash==='cloud' && p.length >= 6) ops = cloudPoly(pairs(p), w);
+      else { ops = [['M',p[0],p[1]]]; for(let i=2;i<p.length;i+=2) ops.push(['L',p[i],p[i+1]]); if(closed) ops.push(['Z']); }
+      const holes = closed ? (a.holes||[]).filter(h => h.length>=6) : [];
+      holes.forEach(h => { ops.push(['M',h[0],h[1]]); for(let i=2;i<h.length;i+=2) ops.push(['L',h[i],h[i+1]]); ops.push(['Z']); });
       const fo = closed ? fillOf(a,col) : {fill:null, op:1};
-      out.push({k:'path', ops, stroke:a.dash==='none'?null:col, fill:fo.fill, op:fo.op, width:w, dash:ds.arr, cap:ds.cap}); }
+      out.push({k:'path', ops, stroke:a.dash==='none'?null:col, fill:fo.fill, op:fo.op, width:w, dash:a.dash==='cloud'?null:ds.arr, cap:ds.cap, evenOdd:holes.length>0}); }
+  }
+  else if(a.type === 'angle'){
+    if(a.pts && a.pts.length >= 4){
+      const p = a.pts, ops = [['M',p[0],p[1]],['L',p[2],p[3]]]; if(p.length >= 6) ops.push(['L',p[4],p[5]]);
+      out.push({k:'path', ops, stroke:col, fill:null, width:w, dash:null, cap:0});
+      if(p.length === 6){ const g = angleGeom(a), arc = [], n = Math.max(6, Math.ceil(Math.abs(g.d)/(Math.PI/36)));
+        for(let i=0;i<=n;i++){ const t = g.a1 + g.d*i/n; arc.push([i?'L':'M', g.vx+Math.cos(t)*g.r, g.vy+Math.sin(t)*g.r]); }
+        out.push({k:'path', ops:arc, stroke:col, fill:null, width:Math.max(0.6,w*0.7), dash:null, cap:0}); }
+    }
   }
   else if(a.type === 'count'){
     const g = ((ctx && ctx.groups) || []).find(g => g.id===a.group) || {color:'#e03131', shape:'circle'}, r = (a.size||9)/2;
@@ -249,7 +280,7 @@ function primsToSvg(ps){
   return ps.map(p => {
     if(p.k === 'image') return `<image href="${p.src}" x="${r2(p.x)}" y="${r2(p.y)}" width="${r2(p.w)}" height="${r2(p.h)}" preserveAspectRatio="none"/>`;
     if(p.k === 'text') return `<text x="${r2(p.x)}" y="${r2(p.y)}"${p.bold?' font-weight="bold"':''}${p.rot?` transform="rotate(${r2(p.rot*180/Math.PI)} ${r2(p.x)} ${r2(p.y)})"`:''} font-size="${p.size}" fill="${p.color}" font-family="Helvetica, Arial, sans-serif" xml:space="preserve">${escX(p.str)}</text>`;
-    return `<path d="${opsToD(p.ops)}" fill="${p.fill||'none'}"${p.op&&p.op<1?` fill-opacity="${p.op}"`:''} stroke="${p.stroke||'none'}"${p.stroke?` stroke-width="${p.width}" stroke-linejoin="round" stroke-linecap="${p.cap?'round':'butt'}"${p.dash?` stroke-dasharray="${p.dash.map(r2).join(' ')}"`:''}`:''}/>`;
+    return `<path d="${opsToD(p.ops)}"${p.evenOdd?' fill-rule="evenodd"':''} fill="${p.fill||'none'}"${p.op&&p.op<1?` fill-opacity="${p.op}"`:''} stroke="${p.stroke||'none'}"${p.stroke?` stroke-width="${p.width}" stroke-linejoin="round" stroke-linecap="${p.cap?'round':'butt'}"${p.dash?` stroke-dasharray="${p.dash.map(r2).join(' ')}"`:''}`:''}/>`;
   }).join('');
 }
 
@@ -331,7 +362,7 @@ async function buildPdf(PDFLib, bytes, opts){
           if(o[0]==='M') ops.push(L.moveTo(o[1],o[2])); else if(o[0]==='L') ops.push(L.lineTo(o[1],o[2]));
           else if(o[0]==='C') ops.push(L.appendBezierCurve(o[1],o[2],o[3],o[4],o[5],o[6])); else ops.push(L.closePath());
         });
-        ops.push(p.fill && p.stroke ? L.fillAndStroke() : p.fill ? L.fill() : L.stroke());
+        ops.push(p.evenOdd && p.fill ? PDFOperator.of(p.stroke ? 'B*' : 'f*', []) : p.fill && p.stroke ? L.fillAndStroke() : p.fill ? L.fill() : L.stroke());
         ops.push(L.popGraphicsState());
       }));
       if(ocg[g.l.id]) ops.push(PDFOperator.of('EMC', []));
@@ -364,6 +395,6 @@ async function rasterizePdf(pdfjsLib, PDFLib, bytes, o){
   return out.save();
 }
 
-return {polyLen, polyArea, fmtArea, stampBox, markerOps, rasterizePdf, dimLabels, setMeasure, fmtLen, prims, primsToSvg, textBox, bbox, buildPdf, PT_MM, FILLS, rectOps, circleOps, opsToD};
+return {areaNet, volumeM3, angleGeom, fmtNum, cloudPoly, polyLen, polyArea, fmtArea, stampBox, markerOps, rasterizePdf, dimLabels, setMeasure, fmtLen, prims, primsToSvg, textBox, bbox, buildPdf, PT_MM, FILLS, rectOps, circleOps, opsToD};
 })();
 if(typeof module !== 'undefined') module.exports = BladrCore;

@@ -16,6 +16,7 @@ DIST = os.path.join(ROOT, 'dist')
 
 CDN_PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/'
 CDN_PDFLIB = 'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/'
+CDN_XLSX = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/'
 
 PWA_HEAD = '''<!doctype html>
 <html lang="da">
@@ -98,7 +99,7 @@ def build_artifact(app):
 
 
 def build_pwa(app, version):
-    body = app.replace(CDN_PDFJS, 'vendor/').replace(CDN_PDFLIB, 'vendor/')
+    body = app.replace(CDN_PDFJS, 'vendor/').replace(CDN_PDFLIB, 'vendor/').replace(CDN_XLSX, 'vendor/')
     # Arbejderen kører som rigtig web worker i appen, så den skal ikke også indlæses på siden.
     body, n = re.subn(r'<script src="vendor/pdf\.worker\.min\.js"></script>\n?', '', body)
     if n != 1 or 'cdnjs.cloudflare.com' in body:
@@ -108,7 +109,7 @@ def build_pwa(app, version):
     write(os.path.join(DOCS, 'sw.js'), read(os.path.join(SRC, 'sw.js')).replace('__VERSION__', version))
     write(os.path.join(DOCS, 'manifest.webmanifest'), json.dumps(MANIFEST, ensure_ascii=False, indent=2) + '\n')
     write(os.path.join(DOCS, '.nojekyll'), '')
-    for f in ('pdf.min.js', 'pdf.worker.min.js', 'pdf-lib.min.js'):
+    for f in ('pdf.min.js', 'pdf.worker.min.js', 'pdf-lib.min.js', 'xlsx.full.min.js'):
         if not os.path.exists(os.path.join(DOCS, 'vendor', f)):
             raise SystemExit(f'Mangler docs/vendor/{f}')
 

@@ -1,9 +1,9 @@
 /* Bladr service worker: gør appen tilgængelig offline og giver besked om nye versioner. */
-const VERSION = '2026.11.02-1915';
+const VERSION = '2026.11.11-1920';
 const CACHE = 'bladr-' + VERSION;
 const ASSETS = [
   './', 'index.html', 'pwa.js', 'manifest.webmanifest',
-  'vendor/pdf.min.js', 'vendor/pdf.worker.min.js', 'vendor/pdf-lib.min.js',
+  'vendor/pdf.min.js', 'vendor/pdf.worker.min.js', 'vendor/pdf-lib.min.js', 'vendor/xlsx.full.min.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/favicon-32.png'
 ];
 

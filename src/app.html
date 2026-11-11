@@ -250,6 +250,23 @@ kbd{font:11px var(--mono);border:1px solid var(--line);border-bottom-width:2px;b
 .helpcode code{flex:1;min-width:0;font:12.5px var(--mono);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;overflow-x:auto;white-space:nowrap;user-select:all;color:var(--fg)}
 #helpIcons p{color:var(--muted);font-size:13px}
 #helpIcons a{color:var(--accent)}
+.xstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(78px,1fr));gap:6px}
+.xstats div{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;display:flex;flex-direction:column;min-width:0}
+.xstats span{font-size:11px;color:var(--muted)}
+.xstats b{font-family:var(--mono);font-size:13px;font-weight:500;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.xtable{max-height:240px;overflow:auto;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+.xtable table,table.calc{border-collapse:collapse;font-size:12px;width:100%}
+.xtable td{border-bottom:1px solid var(--line);padding:3px 6px;white-space:nowrap}
+.xtable td.n,table.calc .n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.calcwrap{border:1px solid var(--line);border-radius:8px;margin-bottom:12px;background:var(--panel)}
+.calcwrap summary{cursor:pointer;padding:8px 10px;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.calcwrap > div{padding:0 8px 8px;overflow-x:auto}
+table.calc th{font-size:10.5px;color:var(--muted);text-align:left;font-weight:600;padding:3px 4px;white-space:nowrap}
+table.calc td{padding:3px 4px;border-top:1px solid var(--line);vertical-align:middle}
+table.calc td:first-child{min-width:90px}
+table.calc .num{height:26px;width:62px;padding:0 5px;font-size:12px}
+table.calc .ct{width:44px}
+.calctotal{font-weight:600;font-size:13px;padding:6px 2px 0}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:9px 14px;border-radius:8px;font-size:13px;z-index:60;max-width:calc(100% - 32px)}
 
 @media (max-width:1700px){ .ib .lbl{display:none} }
@@ -301,6 +318,8 @@ kbd{font:11px var(--mono);border:1px solid var(--line);border-bottom-width:2px;b
       <button class="ib tool" data-tool="measure" title="Mål afstand (M)"><svg viewBox="0 0 24 24"><path d="M4 12h16M4 8v8M20 8v8M8 12v-2M12 12V9M16 12v-2"/></svg><span class="lbl">Mål</span></button>
       <button class="ib tool" data-tool="poly" title="Polylinje med længde (P) – klik punkter, dobbeltklik afslutter"><svg viewBox="0 0 24 24"><path d="M3 18l6-9 5 6 7-10"/><circle cx="3" cy="18" r="1.5"/><circle cx="21" cy="5" r="1.5"/></svg><span class="lbl">Polylinje</span></button>
       <button class="ib tool" data-tool="area" title="Areal og omkreds (F)"><svg viewBox="0 0 24 24"><path d="M4 7l9-3 7 6-3 10H6z"/><path d="M9 13h6" opacity=".6"/></svg><span class="lbl">Areal</span></button>
+      <button class="ib tool" data-tool="angle" title="Vinkel (G) – klik på første ben, vinkelspidsen og andet ben"><svg viewBox="0 0 24 24"><path d="M4 19L18 5M4 19h16"/><path d="M10 19a7 7 0 0 0-2-4.6"/></svg><span class="lbl">Vinkel</span></button>
+      <button class="ib tool" data-tool="extract" title="Udtræk og hurtig sum (X) – træk en ramme om tal eller en tabel"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 9h18M9 4v16"/><path d="M13 13h5M13 16.5h3" opacity=".7"/></svg><span class="lbl">Udtræk</span></button>
       <button class="ib tool" data-tool="count" title="Tæl (K)"><svg viewBox="0 0 24 24"><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="7" r="2.5"/><circle cx="7" cy="17" r="2.5"/><path d="M14 17h6M17 14v6"/></svg><span class="lbl">Tæl</span></button>
       <button class="ib tool" data-tool="stamp" title="Stempel (S)"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1"/><rect x="5.5" y="9.5" width="13" height="5" rx=".5"/></svg><span class="lbl">Stempel</span></button>
     </div>
@@ -341,6 +360,18 @@ kbd{font:11px var(--mono);border:1px solid var(--line);border-bottom-width:2px;b
         <input class="num" id="kitName" placeholder="Navn, fx Kabelbakke" style="font-family:var(--sans)" aria-label="Værktøjets navn">
         <input class="num" id="kitLayer" list="kitLayerList" placeholder="Standardlag (valgfrit), fx Kabelføring" style="font-family:var(--sans)" aria-label="Standardlag"><datalist id="kitLayerList"></datalist>
         <div class="row" style="display:flex;gap:6px;justify-content:flex-end"><button type="button" class="ghost" id="kitCancel">Annullér</button><button type="button" class="primary" id="kitOk">Gem værktøj</button></div>
+      </div>
+    </section>
+    <section class="psec" id="secExtract" hidden>
+      <h3>Udtræk og hurtig sum</h3>
+      <p class="pnote" id="xHint">Træk en ramme om tal eller en tabel i PDF'en. Bladr lægger tallene sammen og kan gemme tabellen som Excel.</p>
+      <div id="xRes" hidden style="display:flex;flex-direction:column;gap:9px">
+        <div class="xstats" id="xStats"></div>
+        <div class="prow"><label class="plabel" for="xCol">Regn på</label><select class="sel" id="xCol" style="max-width:none"></select></div>
+        <p class="pnote" id="xInfo"></p>
+        <div class="xtable" id="xTable"></div>
+        <div class="pair" style="display:flex;gap:6px"><button type="button" class="ghost" id="xCopy" style="flex:1">Kopiér til Excel</button><button type="button" class="primary" id="xSave" style="flex:1;justify-content:center">Gem som Excel</button></div>
+        <button type="button" class="linkbtn" id="xClear">Ryd udtræk</button>
       </div>
     </section>
     <section class="psec" id="secCount" hidden>
@@ -400,6 +431,12 @@ kbd{font:11px var(--mono);border:1px solid var(--line);border-bottom-width:2px;b
       <button type="button" class="linkbtn" id="uSet">Skift enheder for denne PDF</button>
       <div class="prow" id="rG1"><label class="plabel" for="g1" id="g1l">Længde</label><input class="num" id="g1" inputmode="decimal"></div>
       <div class="prow" id="rG2"><label class="plabel" for="g2" id="g2l">Vinkel</label><input class="num" id="g2" inputmode="decimal"></div>
+      <div id="rArea" style="display:flex;flex-direction:column;gap:9px">
+        <div class="prow"><span class="plabel">Huller</span><div class="pair"><button type="button" class="ghost" id="aHole">+ Træk hul fra</button><button type="button" class="ghost" id="aHoleDel" title="Fjern det sidst tilføjede hul">Fjern sidste</button></div></div>
+        <div class="prow"><label class="plabel" for="aVdir">Rumfang</label><select class="sel" id="aVdir" style="max-width:none"><option value="">Intet rumfang</option><option value="cut">Udgravning – hul (fx kabelgrav)</option><option value="fill">Opbygning – stikker op (fx bygning)</option></select></div>
+        <div class="prow" id="rADepth"><label class="plabel" for="aDepth" id="aDepthL">Dybde</label><input class="num" id="aDepth" inputmode="decimal"></div>
+        <p class="pnote" id="aVolNote"></p>
+      </div>
     </section>
     <section class="psec" id="secIns">
       <h3>Indsæt figur ud fra mål</h3>
@@ -426,9 +463,11 @@ kbd{font:11px var(--mono);border:1px solid var(--line);border-bottom-width:2px;b
     <div class="pane" id="paneList" hidden>
       <div class="lfilter"><select class="sel" id="lfStatus" aria-label="Filtrér på status"><option value="">Alle statusser</option><option value="open">Åben</option><option value="progress">I gang</option><option value="done">Udbedret</option><option value="rejected">Afvist</option><option value="none">Uden status</option></select>
         <select class="sel" id="lfLayer" aria-label="Filtrér på lag"></select></div>
+      <details class="calcwrap" id="calcBox"><summary>Mængder og beregning</summary><div><div id="calcRows"></div><div class="calctotal" id="calcTotal"></div>
+        <p class="pnote" style="margin-top:6px">Skriv en pris eller faktor ud for en mængde, fx 85 kr/m kabel eller 0,445 kWp pr. panel. Mængder samles pr. lag eller gemt værktøj.</p></div></details>
       <div class="lsum" id="lSum"></div>
       <div class="list" id="lItems"></div>
-      <button class="primary" id="lExport" style="width:100%;justify-content:center">Eksportér til Excel (CSV)</button>
+      <button class="primary" id="lExport" style="width:100%;justify-content:center">Eksportér til Excel</button>
       <div class="note">Klik på en markering for at gå til den. Status og kommentar sættes under Værktøj, når markeringen er valgt.</div>
     </div>
     <div class="pane" id="paneFind" hidden><div class="status" id="findStatus">Skriv i søgefeltet for at søge.</div><div class="results" id="results"></div></div>
@@ -581,6 +620,7 @@ kbd{font:11px var(--mono);border:1px solid var(--line);border-bottom-width:2px;b
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 __CORE__
 </script>
@@ -596,7 +636,7 @@ const mctx = document.createElement('canvas').getContext('2d');
 C.setMeasure((s, size) => { mctx.font = size + 'px Helvetica, Arial, sans-serif'; return mctx.measureText(s).width; });
 
 let doc=null, docKey='', docName='', origBytes=null, encrypted=false, pages=[], sizes=[], base=null, scale=1, fit='width', rot=0, cur=1;
-let pageTexts=null, query='', loadingTask=null, gen=0;
+let pageTexts=null, query='', loadingTask=null, gen=0, textCache={}, extractSel=null, extractGrid=null;
 let S = freshState();            // markeringer for det åbne dokument
 let tool='select', selId=null, editingId=null, drag=null, undoStack=[], redoStack=[];
 const COLORS = ['#e03131','#1c7ed6','#2f9e44','#f08c00','#c2255c','#212529'];
@@ -610,12 +650,13 @@ const defaults = {
   measure:{color:'#1c7ed6',width:1,size:10,ends:'tick'},
   poly:{color:'#1c7ed6',width:1.5,dash:'solid',showDim:false,size:10},
   area:{color:'#2f9e44',width:1,dash:'solid',fill:'tint',size:10},
+  angle:{color:'#1c7ed6',width:1.2,size:11},
   count:{size:9},
   stamp:{label:'GODKENDT',color:'#2f9e44',size:14,showName:true,showDate:true},
 };
 function unitDefaults(){let d={};try{d=JSON.parse(localStorage.getItem('bladr:defaults')||'{}')||{}}catch{}return {unit:d.unit||'m',paperUnit:d.paperUnit||'mm',dec:d.dec||'auto'}}
 function freshState(){ const d=unitDefaults(); return {layers:[{id:'l1',name:'Lag 1',visible:true}], active:'l1', annots:[], scales:{all:null,pages:{}}, unit:d.unit, paperUnit:d.paperUnit, dec:d.dec, inMode:'real', countGroups:[], activeCount:null, kitLayers:{}}; }
-const NAMES={symbol:'Symbol',poly:'Polylinje',area:'Areal',count:'Tæl',stamp:'Stempel',sign:'Underskrift',select:'Vælg',line:'Streg',arrow:'Pil',rect:'Ramme',circle:'Cirkel',text:'Tekstfelt',callout:'Tekst med pil',measure:'Måling',calibrate:'Kalibrering'};
+const NAMES={extract:'Udtræk',angle:'Vinkel',hole:'Hul',symbol:'Symbol',poly:'Polylinje',area:'Areal',count:'Tæl',stamp:'Stempel',sign:'Underskrift',select:'Vælg',line:'Streg',arrow:'Pil',rect:'Ramme',circle:'Cirkel',text:'Tekstfelt',callout:'Tekst med pil',measure:'Måling',calibrate:'Kalibrering'};
 function kindOf(a){ if(a.type==='line')return (a.arrowEnd||a.arrowStart)?'arrow':'line'; if(a.type==='text')return a.leader?'callout':'text'; return a.type; }
 const uid = () => Math.random().toString(36).slice(2,9);
 
@@ -666,7 +707,7 @@ async function openBuffer(buf,name,key,seed){
   finishEdit();
   if(loadingTask){try{loadingTask.destroy()}catch{}}
   if(doc){try{doc.destroy()}catch{}}
-  doc=null;pages=[];sizes=[];pageTexts=null;viewer.innerHTML='';$('thumbs').innerHTML='';encrypted=false;selId=null;
+  doc=null;pages=[];sizes=[];pageTexts=null;textCache={};extractSel=null;extractGrid=null;viewer.innerHTML='';$('thumbs').innerHTML='';encrypted=false;selId=null;
   origBytes=buf.slice(0);
   loadingTask=pdfjsLib.getDocument({data:new Uint8Array(buf)});
   loadingTask.onPassword=(cb,reason)=>{encrypted=true;askPassword(cb,reason===2)};
@@ -797,7 +838,7 @@ function renderAnn(p){
     handlesOf(sel).forEach(h=>{html+=`<rect class="hd" data-h="${h.k}" x="${h.x-hs/2}" y="${h.y-hs/2}" width="${hs}" height="${hs}" fill="#ffffff" stroke="#1f5f8b" stroke-width="${sw*1.3}"/>`});
   }
   if(drag&&drag.preview&&drag.p===p) html+=drag.preview;
-  html+=ghostSvg(p)+polyPreview(p);
+  html+=ghostSvg(p)+polyPreview(p)+extractOverlay(p);
   p.g.innerHTML=html;
 }
 function renderAllAnn(){pages.forEach(renderAnn)}
@@ -807,7 +848,7 @@ function handlesOf(a){
   if(a.type==='circle')return [{k:'r',x:a.cx+a.r,y:a.cy}];
   if(a.type==='sign'||a.type==='symbol')return [{k:'sz',x:a.x+a.w,y:a.y+a.h}];
   if(a.type==='stamp'){const b=C.stampBox(a);return [{k:'st',x:b.x+b.w,y:b.y+b.h}]}
-  if(a.pts){const h=[];for(let i=0;i<a.pts.length;i+=2)h.push({k:'v'+(i/2),x:a.pts[i],y:a.pts[i+1]});return h}
+  if(a.pts){const h=[];for(let i=0;i<a.pts.length;i+=2)h.push({k:'v'+(i/2),x:a.pts[i],y:a.pts[i+1]});(a.holes||[]).forEach((hp,j)=>{for(let i=0;i<hp.length;i+=2)h.push({k:'h'+j+'_'+(i/2),x:hp[i],y:hp[i+1]})});return h}
   if(a.type==='text'&&a.leader)return [{k:'tip',x:a.leader.x,y:a.leader.y}];
   return [];
 }
@@ -822,8 +863,8 @@ function updUndo(){$('btnUndo').disabled=!undoStack.length;$('btnRedo').disabled
 function commit(){persist();renderAllAnn();renderLayers();updProps();updScaleBtn();renderList()}
 
 /* ---------- værktøjer ---------- */
-const HINTS={symbol:'Klik på tegningen for at sætte symbolet ind. Bliv ved med at klikke for flere. Esc afslutter.',poly:'Klik for hvert knæk. Dobbeltklik eller Enter afslutter, Backspace fjerner sidste punkt. Shift låser til 45°.',area:'Klik rundt om fladen. Klik på startpunktet, dobbeltklik eller Enter lukker den. Backspace fjerner sidste punkt.',count:'Klik på hvert element, der skal tælles. Vælg eller opret gruppen herunder.',stamp:'Vælg stempel herunder, og klik på siden, hvor det skal stå.',sign:'Klik på siden, hvor underskriften skal stå. Esc annullerer.',select:'Klik på en markering for at vælge den. Dobbeltklik for at redigere tekst og mål. Klik på papiret eller tryk Esc for at afslutte.',line:'Træk for at tegne. Shift låser til 45°.',arrow:'Træk fra start til spids. Shift låser til 45°.',rect:'Træk en ramme op.',circle:'Træk fra centrum og ud. Afstanden er radius.',text:'Klik hvor teksten skal stå. Klik på et eksisterende tekstfelt for at redigere det.',callout:'Træk fra punktet pilen skal pege på, hen til hvor teksten skal stå.',measure:'Træk mellem to punkter. Shift låser til 45°.',calibrate:'Træk mellem to punkter med kendt afstand.'};
-const SELHINT={symbol:'Træk for at flytte, og træk i hjørnet for at ændre størrelsen. Den nye størrelse huskes til næste gang.',poly:'Træk i punkterne for at justere. Slå delmål til under Udseende. Længden kan trækkes til en anden plads.',area:'Træk i punkterne for at justere. Areal og omkreds står i midten og kan trækkes.',count:'Tællepunkt. Delete fjerner det.',stamp:'Træk for at flytte, og træk i hjørnet for at ændre størrelsen. Vælg et andet stempel herunder for at skifte tekst.',sign:'Træk for at flytte. Træk i hjørnet nederst til højre for at ændre størrelsen.',text:'Dobbeltklik for at redigere teksten. Træk for at flytte.',callout:'Dobbeltklik for at redigere teksten. Træk i pilespidsen for at flytte den.',measure:'Træk i måltallet for at flytte det. Dobbeltklik for at skrive din egen tekst. Træk i endepunkterne for at justere.',line:'Træk i endepunkterne, eller skriv længde og vinkel under Mål. Måltallet kan trækkes til en anden plads.',arrow:'Træk i endepunkterne, eller skriv længde og vinkel under Mål. Måltallet kan trækkes til en anden plads.',rect:'Træk i hjørnerne, eller skriv bredde og højde under Mål. Måltallet kan trækkes til en anden plads.',circle:'Træk i håndtaget for at ændre størrelsen, eller skriv målet under Mål. Måltallet kan trækkes til en anden plads.'};
+const HINTS={extract:'Træk en ramme om tal eller en tabel. Du får sum, gennemsnit og antal og kan gemme tabellen som Excel.',angle:'Klik på det første ben, derefter i vinkelspidsen og til sidst på det andet ben.',hole:'Klik rundt om hullet. Klik på startpunktet, dobbeltklik eller Enter for at lukke det. Esc fortryder.',symbol:'Klik på tegningen for at sætte symbolet ind. Bliv ved med at klikke for flere. Esc afslutter.',poly:'Klik for hvert knæk. Dobbeltklik eller Enter afslutter, Backspace fjerner sidste punkt. Shift låser til 45°.',area:'Klik rundt om fladen. Klik på startpunktet, dobbeltklik eller Enter lukker den. Backspace fjerner sidste punkt.',count:'Klik på hvert element, der skal tælles. Vælg eller opret gruppen herunder.',stamp:'Vælg stempel herunder, og klik på siden, hvor det skal stå.',sign:'Klik på siden, hvor underskriften skal stå. Esc annullerer.',select:'Klik på en markering for at vælge den. Dobbeltklik for at redigere tekst og mål. Klik på papiret eller tryk Esc for at afslutte.',line:'Træk for at tegne. Shift låser til 45°.',arrow:'Træk fra start til spids. Shift låser til 45°.',rect:'Træk en ramme op.',circle:'Træk fra centrum og ud. Afstanden er radius.',text:'Klik hvor teksten skal stå. Klik på et eksisterende tekstfelt for at redigere det.',callout:'Træk fra punktet pilen skal pege på, hen til hvor teksten skal stå.',measure:'Træk mellem to punkter. Shift låser til 45°.',calibrate:'Træk mellem to punkter med kendt afstand.'};
+const SELHINT={angle:'Træk i punkterne for at justere vinklen. Vinklen kan trækkes til en anden plads.',symbol:'Træk for at flytte, og træk i hjørnet for at ændre størrelsen. Den nye størrelse huskes til næste gang.',poly:'Træk i punkterne for at justere. Slå delmål til under Udseende. Længden kan trækkes til en anden plads.',area:'Træk i punkterne for at justere. Areal og omkreds står i midten og kan trækkes.',count:'Tællepunkt. Delete fjerner det.',stamp:'Træk for at flytte, og træk i hjørnet for at ændre størrelsen. Vælg et andet stempel herunder for at skifte tekst.',sign:'Træk for at flytte. Træk i hjørnet nederst til højre for at ændre størrelsen.',text:'Dobbeltklik for at redigere teksten. Træk for at flytte.',callout:'Dobbeltklik for at redigere teksten. Træk i pilespidsen for at flytte den.',measure:'Træk i måltallet for at flytte det. Dobbeltklik for at skrive din egen tekst. Træk i endepunkterne for at justere.',line:'Træk i endepunkterne, eller skriv længde og vinkel under Mål. Måltallet kan trækkes til en anden plads.',arrow:'Træk i endepunkterne, eller skriv længde og vinkel under Mål. Måltallet kan trækkes til en anden plads.',rect:'Træk i hjørnerne, eller skriv bredde og højde under Mål. Måltallet kan trækkes til en anden plads.',circle:'Træk i håndtaget for at ændre størrelsen, eller skriv målet under Mål. Måltallet kan trækkes til en anden plads.'};
 function setTool(t){
   if(polyDraw&&t!==tool)cancelPoly();
   if(t!=='symbol')pendingSym=null;
@@ -832,7 +873,7 @@ function setTool(t){
   finishEdit(); tool=t; if(t!=='select'){selId=null;renderAllAnn()}
   document.querySelectorAll('.tool').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tool===t));
   applyToolClass(); updProps();
-  if(DRAWKINDS.includes(t))autoPanel();
+  if(DRAWKINDS.includes(t)||t==='extract')autoPanel();
 }
 function applyToolClass(){viewer.classList.toggle('draw',tool!=='select')}
 document.querySelectorAll('.tool').forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
@@ -862,7 +903,7 @@ function onDown(p,e){
   }
   e.preventDefault(); p.svg.setPointerCapture(e.pointerId);
   if(tool==='sign'){if(pendingSig){placeSig(p,pt);drag={mode:'noop',p}}return}
-  if(tool==='poly'||tool==='area'){polyClick(p,pt,e);drag={mode:'noop',p};return}
+  if(tool==='poly'||tool==='area'||tool==='angle'||tool==='hole'){polyClick(p,pt,e);drag={mode:'noop',p};return}
   if(tool==='count'){placeCount(p,pt);drag={mode:'noop',p};return}
   if(tool==='symbol'){if(pendingSym)placeSymbol(p,pt);drag={mode:'noop',p};return}
   if(tool==='stamp'){if(selId){goHome();return}ensureActiveVisible();addAnnot(makeStamp(pt.x,pt.y),p.n-1,true);ghost=null;drag={mode:'noop',p};return}
@@ -885,7 +926,7 @@ addEventListener('pointermove',e=>{
   }
   if(drag.mode==='noop')return;
   const p=drag.p, pt=evtPt(p,e);
-  if(drag.mode==='draw'){drag.cur=(tool==='rect'||tool==='callout'||tool==='circle')?pt:snap45(drag.start,pt,e);drag.preview=previewSvg();renderAnn(p);return}
+  if(drag.mode==='draw'){drag.cur=(tool==='rect'||tool==='callout'||tool==='circle'||tool==='extract')?pt:snap45(drag.start,pt,e);drag.preview=previewSvg();renderAnn(p);return}
   const dx=pt.x-drag.start.x, dy=pt.y-drag.start.y;
   if(!drag.moved&&Math.hypot(dx,dy)*scale<2)return;
   if(!drag.moved){pushHist();drag.moved=true}
@@ -894,7 +935,7 @@ addEventListener('pointermove',e=>{
   else if(drag.mode==='move'){
     if(a.type==='line'||a.type==='measure'){a.x1=o.x1+dx;a.y1=o.y1+dy;a.x2=o.x2+dx;a.y2=o.y2+dy}
     else if(a.type==='circle'){a.cx=o.cx+dx;a.cy=o.cy+dy}
-    else if(o.pts){a.pts=o.pts.map((v,i)=>v+(i%2?dy:dx))}
+    else if(o.pts){a.pts=o.pts.map((v,i)=>v+(i%2?dy:dx));if(o.holes)a.holes=o.holes.map(h=>h.map((v,i)=>v+(i%2?dy:dx)))}
     else {a.x=o.x+dx;a.y=o.y+dy;if(o.leader&&e.altKey){a.leader={x:o.leader.x+dx,y:o.leader.y+dy}}}
   } else {
     const k=drag.k;
@@ -902,6 +943,7 @@ addEventListener('pointermove',e=>{
     else if(k==='sz'){const r=o.w/o.h;a.w=Math.max(12,pt.x-a.x);a.h=a.w/r}
     else if(k==='st'){const b=C.stampBox(o);a.size=Math.max(5,Math.min(80,o.size*Math.max(10,pt.x-o.x)/b.w))}
     else if(k[0]==='v'){const i=+k.slice(1);a.pts[2*i]=pt.x;a.pts[2*i+1]=pt.y}
+    else if(k[0]==='h'){const [j,i]=k.slice(1).split('_').map(Number);a.holes[j][2*i]=pt.x;a.holes[j][2*i+1]=pt.y}
     else if(k==='1'){const q=snap45({x:o.x2,y:o.y2},pt,e);a.x1=q.x;a.y1=q.y}
     else if(k==='2'){const q=snap45({x:o.x1,y:o.y1},pt,e);a.x2=q.x;a.y2=q.y}
     else if(k==='tip'){a.leader={x:pt.x,y:pt.y}}
@@ -917,6 +959,7 @@ addEventListener('pointerup',e=>{
   const a0=d.start,a1=d.cur,len=Math.hypot(a1.x-a0.x,a1.y-a0.y), pi=d.p.n-1;
   renderAnn(d.p);
   if(d.hadSel&&tool!=='calibrate'&&len*scale<4){goHome();return}
+  if(tool==='extract'){const r={x:Math.min(a0.x,a1.x),y:Math.min(a0.y,a1.y),w:Math.abs(a1.x-a0.x),h:Math.abs(a1.y-a0.y)};if(r.w*scale>6&&r.h*scale>6)runExtract(d.p,r);return}
   if(tool==='calibrate'){
     if(len*scale<6){toast('Træk mellem to punkter.');return}
     calib={pt:len,page:pi}; setTool('select'); openScale(true); return;
@@ -951,6 +994,7 @@ function addAnnot(a,pi,select){
 function previewSvg(){
   const {start:a0,cur:a1}=drag, pi=drag.p.n-1;
   let a;
+  if(tool==='extract')return `<rect x="${Math.min(a0.x,a1.x)}" y="${Math.min(a0.y,a1.y)}" width="${Math.abs(a1.x-a0.x)}" height="${Math.abs(a1.y-a0.y)}" fill="rgba(31,95,139,.08)" stroke="#1f5f8b" stroke-width="${1.2/scale}" stroke-dasharray="${5/scale} ${3/scale}"/>`;
   if(tool==='rect'){const df=defaults.rect;a=Object.assign({},df,{type:'rect',x:Math.min(a0.x,a1.x),y:Math.min(a0.y,a1.y),w:Math.max(1,Math.abs(a1.x-a0.x)),h:Math.max(1,Math.abs(a1.y-a0.y))})}
   else if(tool==='circle')a=Object.assign({},defaults.circle,{type:'circle',cx:a0.x,cy:a0.y,r:Math.max(1,Math.hypot(a1.x-a0.x,a1.y-a0.y))});
   else if(tool==='measure')a=Object.assign({type:'measure',x1:a0.x,y1:a0.y,x2:a1.x,y2:a1.y},defaults.measure);
@@ -1005,7 +1049,7 @@ function finishEdit(){
 
 /* ---------- egenskabspanel ---------- */
 COLORS.forEach(c=>{const b=document.createElement('button');b.className='sw';b.style.background=c;b.dataset.c=c;b.title='Farve';b.setAttribute('aria-label','Farve '+c);b.onclick=()=>setProp('color',c);$('pColor').appendChild(b)});
-const DRAWKINDS=['line','arrow','rect','circle','text','callout','measure','poly','area','count','stamp'];
+const DRAWKINDS=['line','arrow','rect','circle','text','callout','measure','poly','area','angle','count','stamp'];
 function propTarget(){const a=selId&&S.annots.find(x=>x.id===selId);if(a)return {a,kind:kindOf(a)};
   if(DRAWKINDS.includes(tool))return {a:null,kind:tool};return null}
 const setVal=(id,v)=>{const el=$(id);if(document.activeElement!==el)el.value=v};
@@ -1021,26 +1065,26 @@ function updProps(){
     setVal('pWidth',String(src.width||1));
     const noStroke=['sign','count','stamp','symbol'].includes(k);
     show('rColor',k!=='count'&&k!=='symbol'&&(k!=='sign'||!src.src)); show('rWidth',!noStroke);
-    show('rDash',k!=='measure'&&!noStroke); setVal('pDash',src.dash||'solid');
-    [...$('pDash').options].forEach(o=>{o.hidden=((o.value==='cloud'||o.value==='none')&&(isLine||k==='poly'))||(o.value==='cloud'&&k==='area')});
+    show('rDash',k!=='measure'&&k!=='angle'&&!noStroke); setVal('pDash',src.dash||'solid');
+    [...$('pDash').options].forEach(o=>{o.hidden=((o.value==='cloud'||o.value==='none')&&(isLine||k==='poly'))});
     show('rFill',['rect','circle','text','callout','area'].includes(k)); setVal('pFill',src.fill||'none');
     show('rArrows',isLine);
     $('pArrS').setAttribute('aria-pressed',!!src.arrowStart);$('pArrE').setAttribute('aria-pressed',!!src.arrowEnd);
     show('rEnds',k==='measure'); setVal('pEnds',src.ends||'tick');
-    show('rDim',shape||k==='poly'); $('pDim').checked=!!src.showDim; $('pDim').parentNode.lastChild.textContent=k==='poly'?' Vis delmål':' Vis mål'; show('pDimKind',k==='circle'); setVal('pDimKind',src.dimKind||'d');
+    show('rDim',shape||k==='poly'||k==='area'); $('pDim').checked=k==='area'?src.showDim!==false:!!src.showDim; $('pDim').parentNode.lastChild.textContent=k==='poly'?' Vis delmål':k==='area'?' Vis areal og mål':' Vis mål'; show('pDimKind',k==='circle'); setVal('pDimKind',src.dimKind||'d');
     show('rLabel',k==='measure'&&!!t.a); const manual=!!(t.a&&t.a.label);
     setVal('pLabelMode',manual?'manual':'auto'); show('rLabelTxt',k==='measure'&&manual); if(t.a)setVal('pLabel',t.a.label||'');
-    show('rSize',['text','callout','measure','poly','area','stamp'].includes(k)||(shape&&!!src.showDim)); setVal('pSize',String(src.size||10));
+    show('rSize',['text','callout','measure','poly','area','angle','stamp'].includes(k)||(shape&&!!src.showDim)); setVal('pSize',String(src.size||10));
     $('rSize').querySelector('.plabel').textContent=k==='stamp'?'Størrelse':'Tekststørrelse';
     show('pLabReset',!!(t.a&&(t.a.lo||t.a.lo2)));
     show('rLayer',!!t.a&&S.layers.length>1);
     if(t.a){$('pLayer').innerHTML=S.layers.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('');$('pLayer').value=t.a.layer}
     show('pDel',!!t.a);
   }
-  show('secUnit',!!doc); show('secIns',!!doc&&tool!=='symbol'&&!(t&&['count','stamp','sign','symbol'].includes(t.kind)));
+  const xt=tool==='extract'; show('secExtract',xt||!!extractGrid); show('secUnit',!!doc&&!xt); show('secIns',!!doc&&!xt&&tool!=='symbol'&&!(t&&['count','stamp','sign','symbol'].includes(t.kind)));
   show('secCount',tool==='count'||!!(t&&t.kind==='count')); if(!$('secCount').hidden)renderCount();
   show('secStamp',tool==='stamp'||!!(t&&t.kind==='stamp')); if(!$('secStamp').hidden)renderStamps();
-  show('secKit',!!doc); renderKit(); updFollow();
+  show('secKit',!!doc&&!xt); renderKit(); updFollow();
   updGeo(); updIns();
 }
 function setProp(k,v){
@@ -1085,7 +1129,8 @@ function geoFields(a){
   if(a.type==='rect')return [{k:'w',l:'Bredde',v:a.w},{k:'h',l:'Højde',v:a.h}];
   if(a.type==='circle')return [{k:'d',l:'Diameter',v:2*a.r},{k:'r',l:'Radius',v:a.r}];
   if(a.type==='poly')return [{k:'plen',l:'Længde i alt',v:C.polyLen(a.pts,false),ro:1},{k:'pn',l:'Punkter',v:a.pts.length/2,ro:1,raw:1}];
-  if(a.type==='area')return [{k:'ar',l:'Areal',v:C.polyArea(a.pts),ro:1,area:1},{k:'om',l:'Omkreds',v:C.polyLen(a.pts,true),ro:1}];
+  if(a.type==='area')return [{k:'ar',l:(a.holes&&a.holes.length)?'Areal, netto':'Areal',v:C.areaNet(a),ro:1,area:1},{k:'om',l:'Omkreds',v:C.polyLen(a.pts,true),ro:1}];
+  if(a.type==='angle'&&a.pts.length===6)return [{k:'deg',l:'Vinkel (°)',v:C.angleGeom(a).deg,ro:1,ang:1}];
   return null;
 }
 function updGeo(){
@@ -1098,11 +1143,25 @@ function updGeo(){
   ['1','2'].forEach((n,i)=>{
     const row=$('rG'+n), inp=$('g'+n);
     if(!f){row.hidden=true;return}
-    row.hidden=false; const fd=f[i]; inp.dataset.k=fd.k;
+    const fd=f[i]; if(!fd){row.hidden=true;return} row.hidden=false; inp.dataset.k=fd.k;
     $('g'+n+'l').textContent=fd.ang||fd.raw?fd.l:fd.l+' ('+U.s+(fd.area?'²':'')+')'; inp.readOnly=!!fd.ro;
     setVal('g'+n,fd.ang?fmtNum(fd.v,1):fd.raw?String(fd.v):fd.area?fmtNum(fromPt2(fd.v,u,a.page),prec(U)):fmtNum(fromPt(fd.v,u,a.page),prec(U)));
   });
+  /* areal: huller og rumfang */
+  const isArea=!!(a&&a.type==='area'); $('rArea').hidden=!isArea; if(!isArea)return;
+  const nh=(a.holes||[]).length; $('aHoleDel').disabled=!nh; $('aHoleDel').textContent=nh?'Fjern sidste ('+nh+')':'Fjern sidste';
+  setVal('aVdir',a.vdir||''); $('rADepth').hidden=!a.vdir;
+  $('aDepthL').textContent=(a.vdir==='fill'?'Højde':'Dybde')+' ('+S.unit+')';
+  const uf=UNITS[S.unit].f; setVal('aDepth',a.depth?fmtNum(a.depth*uf,UNITS[S.unit].p):'');
+  const v=C.volumeM3(a,annCtx(a.page+1));
+  $('aVolNote').textContent=!a.vdir?'Vælg udgravning eller opbygning for at få rumfanget.':!pageScale(a.page)?'Rumfang kræver, at siden har en skala.':!a.depth?'Skriv '+(a.vdir==='fill'?'højden':'dybden')+' for at få rumfanget.':'Rumfang: '+fmtNum(v,2)+' m³ '+(a.vdir==='cut'?'udgravning':'opbygning')+'.';
+  $('aVolNote').classList.toggle('warn',!!a.vdir&&!pageScale(a.page));
 }
+$('aHole').onclick=()=>{const a=selId&&S.annots.find(x=>x.id===selId);if(!a||a.type!=='area')return;holeTarget=a.id;setTool('hole');toast('Klik rundt om hullet. Enter eller klik på startpunktet lukker det.',4000)};
+$('aHoleDel').onclick=()=>{const a=selId&&S.annots.find(x=>x.id===selId);if(!a||!(a.holes||[]).length)return;pushHist();a.holes.pop();commit()};
+$('aVdir').onchange=e=>{const a=selId&&S.annots.find(x=>x.id===selId);if(!a)return;pushHist();a.vdir=e.target.value||undefined;commit();if(a.vdir&&!a.depth)setTimeout(()=>$('aDepth').focus(),20)};
+function setDepth(){const a=selId&&S.annots.find(x=>x.id===selId);if(!a)return;const v=num($('aDepth').value);if(!(v>=0)){updGeo();return}pushHist();a.depth=v/UNITS[S.unit].f||undefined;commit()}
+$('aDepth').addEventListener('change',setDepth);$('aDepth').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();setDepth();e.target.select()}});
 function setGeo(inp){
   const a=selId&&S.annots.find(x=>x.id===selId); if(!a)return;
   const k=inp.dataset.k, v=num(inp.value); if(!isFinite(v)){updGeo();return}
@@ -1168,6 +1227,7 @@ function restorePanel(){
 }
 function goHome(){
   finishEdit(); cancelPoly(); if(tool!=='select')setTool('select');
+  if(extractSel){const p=extractSel.p;extractSel=null;extractGrid=null;renderAnn(p)}
   selId=null; renderAllAnn(); updProps(); restorePanel();
 }
 $('pDone').onclick=goHome;
@@ -1376,28 +1436,34 @@ const today=()=>new Date().toLocaleDateString('da-DK',{day:'2-digit',month:'2-di
 /* ---------- polylinje og areal ---------- */
 let polyDraw=null;
 function lastPt(){const p=polyDraw.pts,n=p.length;return {x:p[n-2],y:p[n-1]}}
+function polyKind(){return tool==='area'||tool==='angle'||tool==='hole'?tool:'poly'}
+function polyNeed(){return {area:6,hole:6,angle:6,poly:4}[polyKind()]}
+let holeTarget=null;
 function polyClick(p,pt,e){
-  if(!polyDraw&&selId){goHome();return}
+  if(tool==='hole'){const t=S.annots.find(x=>x.id===holeTarget);if(!t||t.page!==p.n-1){toast('Hullet skal tegnes på samme side som arealet.');return}}
+  else if(!polyDraw&&selId){goHome();return}
   if(polyDraw&&polyDraw.p!==p){finishPoly();return}
   if(!polyDraw)polyDraw={p,pts:[],hover:null};
   const n=polyDraw.pts.length, q=n?snap45(lastPt(),pt,e):pt;
   if(n>=2&&Math.hypot(q.x-polyDraw.pts[n-2],q.y-polyDraw.pts[n-1])*scale<6){finishPoly();return}
-  if(tool==='area'&&n>=6&&Math.hypot(q.x-polyDraw.pts[0],q.y-polyDraw.pts[1])*scale<9){finishPoly();return}
+  if((tool==='area'||tool==='hole')&&n>=6&&Math.hypot(q.x-polyDraw.pts[0],q.y-polyDraw.pts[1])*scale<9){finishPoly();return}
   polyDraw.pts.push(q.x,q.y); renderAnn(p);
+  if(tool==='angle'&&polyDraw.pts.length>=6)finishPoly();
 }
 function finishPoly(){
   const d=polyDraw; polyDraw=null; if(!d)return;
-  const kind=tool==='area'?'area':'poly';
-  if(d.pts.length<(kind==='area'?6:4)){renderAnn(d.p);toast(kind==='area'?'Et areal skal have mindst tre punkter.':'En polylinje skal have mindst to punkter.');return}
-  addAnnot(Object.assign({type:kind,pts:d.pts.slice()},defaults[kind]),d.p.n-1,true);
+  const kind=polyKind();
+  if(d.pts.length<polyNeed()){renderAnn(d.p);toast({area:'Et areal skal have mindst tre punkter.',hole:'Et hul skal have mindst tre punkter.',angle:'En vinkel skal have tre punkter.',poly:'En polylinje skal have mindst to punkter.'}[kind]);return}
+  if(kind==='hole'){const t=S.annots.find(x=>x.id===holeTarget);if(!t)return;pushHist();(t.holes=t.holes||[]).push(d.pts.slice());holeTarget=null;setTool('select');selId=t.id;commit();autoPanel();toast('Hullet er trukket fra arealet.');return}
+  addAnnot(Object.assign({type:kind,pts:d.pts.slice(0,kind==='angle'?6:undefined)},defaults[kind]),d.p.n-1,true);
 }
 function cancelPoly(){if(!polyDraw)return;const p=polyDraw.p;polyDraw=null;renderAnn(p)}
 function polyPreview(p){
   if(!polyDraw||polyDraw.p!==p||!polyDraw.pts.length)return '';
   const pts=polyDraw.pts.slice(); if(polyDraw.hover)pts.push(polyDraw.hover.x,polyDraw.hover.y);
-  const kind=tool==='area'?'area':'poly', s=scale;
+  const kind=polyKind(), s=scale;
   let h='';
-  if(pts.length>=4)h+=C.primsToSvg(C.prims(Object.assign({},defaults[kind],{type:kind,pts}),annCtx(p.n)));
+  if(pts.length>=4){const pa=kind==='hole'?{type:'area',pts,color:'#e03131',width:1.2,dash:'dash',fill:'none',showDim:false}:Object.assign({},defaults[kind],{type:kind,pts:kind==='angle'?pts.slice(0,6):pts});h+=C.primsToSvg(C.prims(pa,annCtx(p.n)))}
   for(let i=0;i<polyDraw.pts.length;i+=2)h+=`<circle cx="${polyDraw.pts[i]}" cy="${polyDraw.pts[i+1]}" r="${3/s}" fill="#ffffff" stroke="#1f5f8b" stroke-width="${1.2/s}"/>`;
   return h;
 }
@@ -1661,7 +1727,8 @@ function describe(a){
     case 'circle': return ['Cirkel','Ø '+F(2*a.r)];
     case 'text': return [a.leader?'Tekst med pil':'Tekst',(a.text||'').replace(/\n/g,' ')];
     case 'poly': return ['Polylinje',F(C.polyLen(a.pts,false))];
-    case 'area': return ['Areal',C.fmtArea(C.polyArea(a.pts),c)+', omkreds '+F(C.polyLen(a.pts,true))];
+    case 'area': {const v=C.volumeM3(a,c);return ['Areal',C.fmtArea(C.areaNet(a),c)+((a.holes&&a.holes.length)?' netto':'')+', omkreds '+F(C.polyLen(a.pts,true))+(v!=null?', rumfang '+(a.vdir==='cut'?'-':'+')+C.fmtNum(v,2)+' m³ '+(a.vdir==='cut'?'udgravning':'opbygning'):'')]}
+    case 'angle': return ['Vinkel',a.pts.length===6?C.fmtNum(C.angleGeom(a).deg,1)+'°':''];
     case 'stamp': return ['Stempel',a.label+(a.sub?' ('+a.sub+')':'')];
     case 'sign': return ['Underskrift',''];
     case 'symbol': return ['Symbol',a.name||''];
@@ -1681,6 +1748,7 @@ function listRows(){
 }
 function renderList(){
   if($('paneList').hidden)return;
+  renderCalc();
   const ll=$('lfLayer'), lv=ll.value; ll.innerHTML='<option value="">Alle lag</option>'+S.layers.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join(''); ll.value=S.layers.some(l=>l.id===lv)?lv:'';
   const {rows,counts}=listRows(), box=$('lItems'); box.innerHTML='';
   const st={}; S.annots.forEach(a=>{if(a.type!=='count'&&a.status)st[a.status]=(st[a.status]||0)+1});
@@ -1704,19 +1772,147 @@ function renderList(){
   }
 }
 ['lfStatus','lfLayer'].forEach(id=>$(id).onchange=renderList);
-function csvCell(v){v=v==null?'':String(v);return /[;"\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}
-$('lExport').onclick=async()=>{
-  if(!doc)return; if(!downloads){toast('Gem af filer er ikke tilgængeligt i denne visning.');return}
+$('lExport').onclick=()=>{
+  if(!doc)return; if(typeof XLSX==='undefined'){toast('Excel-modulet er ikke indlæst.');return}
   const {rows,counts}=listRows(), fmtD=t=>t?new Date(t).toLocaleString('da-DK',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
-  const lines=[['Nr','Side','Lag','Type','Beskrivelse','Status','Kommentar','Oprettet','Af'].join(';')];
-  rows.forEach((a,i)=>{const [t,d]=describe(a),l=S.layers.find(x=>x.id===a.layer);lines.push([i+1,a.page+1,l?l.name:'',t,d,STATUS[a.status]||'',a.note||'',fmtD(a.created),a.author||''].map(csvCell).join(';'))});
-  if(counts.length){lines.push('');lines.push(['Optælling','Side','Antal'].join(';'));
-    counts.forEach(c=>{const g=c.sym?{name:c.sym}:S.countGroups.find(x=>x.id===c.g);lines.push([g?g.name:'',c.page+1,c.n].map(csvCell).join(';'))});
-    const tot={}; counts.forEach(c=>{const nm=c.sym||(S.countGroups.find(x=>x.id===c.g)||{}).name||'';tot[nm]=(tot[nm]||0)+c.n});
-    Object.entries(tot).forEach(([nm,n])=>lines.push([nm,'I alt',n].map(csvCell).join(';')))}
-  try{await downloads.save({filename:docName.replace(/\.pdf$/i,'').replace(/[\\/:*?"<>|]/g,'-')+' - markeringsliste.csv',data:'﻿'+lines.join('\r\n')});toast('Markeringslisten er gemt')}
-  catch(err){if(!err||err.code!=='declined')toast('Listen kunne ikke gemmes.')}
+  const m=[['Nr','Side','Lag','Type','Beskrivelse','Status','Kommentar','Oprettet','Af']];
+  rows.forEach((a,i)=>{const [t,d]=describe(a),l=S.layers.find(x=>x.id===a.layer);m.push([i+1,a.page+1,l?l.name:'',t,d,STATUS[a.status]||'',a.note||'',fmtD(a.created),a.author||''])});
+  const o=[['Optælling','Side','Antal']];
+  counts.forEach(c=>{const g=c.sym?{name:c.sym}:S.countGroups.find(x=>x.id===c.g);o.push([g?g.name:'',c.page+1,c.n])});
+  const tot={}; counts.forEach(c=>{const nm=c.sym||(S.countGroups.find(x=>x.id===c.g)||{}).name||'';tot[nm]=(tot[nm]||0)+c.n});
+  if(counts.length){o.push([]);Object.entries(tot).forEach(([nm,n])=>o.push([nm,'I alt',n]))}
+  S.calc=S.calc||{}; const q=[['Mængde','Antal','Enhed','Pris/faktor','Resultat','Enhed']];
+  quantities().forEach(r=>{const c=S.calc[r.key]||{},has=c.f!=null&&c.f!=='';q.push([r.label,+r.qty.toFixed(r.unit==='stk'?0:3),r.unit,has?c.f:'',has?+(r.qty*c.f).toFixed(2):'',c.t||''])});
+  const sheets=[['Markeringer',m,[5,6,14,14,40,12,30,17,14]],['Optælling',o,[28,8,8]],['Mængder',q,[34,12,12,12,14,8]]];
+  if(extractGrid&&extractGrid.length)sheets.push(['Udtræk',extractGrid.map(r=>r.map(c=>{const v=pureNum(c);return v!=null?v:c}))]);
+  saveFile(docName.replace(/\.pdf$/i,'')+' - markeringsliste.xlsx',xlsxBlob(sheets),'Markeringslisten er gemt som Excel');
 };
+
+/* ---------- tekst fra PDF'en (bruges af udtræk og tæl tekst) ---------- */
+async function textItems(pi){
+  if(textCache[pi])return textCache[pi];
+  const my=gen, page=await doc.getPage(pi+1), vp=page.getViewport({scale:1}), tc=await page.getTextContent(), U=pdfjsLib.Util, out=[];
+  for(const it of tc.items){
+    if(!it.str||!it.str.trim())continue;
+    const t=it.transform, fh=Math.hypot(t[2],t[3])||it.height||1, len=Math.hypot(t[0],t[1])||1, ux=t[0]/len, uy=t[1]/len, w=it.width||0;
+    const p0=[t[4],t[5]], p1=[t[4]+ux*w,t[5]+uy*w], up=[-uy*fh,ux*fh];
+    const q=[p0,p1,[p1[0]+up[0],p1[1]+up[1]],[p0[0]+up[0],p0[1]+up[1]]].map(p=>U.applyTransform(p,vp.transform));
+    const xs=q.map(p=>p[0]), ys=q.map(p=>p[1]);
+    out.push({str:it.str,x0:Math.min(...xs),x1:Math.max(...xs),y0:Math.min(...ys),y1:Math.max(...ys),h:fh,o:q[0],e:q[1],u:[q[3][0]-q[0][0],q[3][1]-q[0][1]]});
+  }
+  if(my===gen)textCache[pi]=out;
+  return out;
+}
+
+/* Tal i dansk og engelsk skrivemåde: 1.234,5 · 1,234.5 · 13,6 · 812 */
+function parseNum(s){
+  const m=String(s).replace(/ /g,' ').trim().match(/^[-−+]?\s?\d[\d .,]*\d|^[-−+]?\d/); if(!m)return null;
+  let t=m[0].replace(/\s/g,'').replace('−','-');
+  const lc=t.lastIndexOf(','), ld=t.lastIndexOf('.');
+  if(lc>-1&&ld>-1){ t=lc>ld?t.replace(/\./g,'').replace(',','.'):t.replace(/,/g,''); }
+  else if(lc>-1){ t=t.split(',').length>2?t.replace(/,/g,''):t.replace(',','.'); }
+  else if(ld>-1){ const parts=t.split('.'); if(parts.length>2||(parts.length===2&&parts[1].length===3))t=t.replace(/\./g,''); }
+  const v=parseFloat(t); return isFinite(v)?v:null;
+}
+const pureNum=s=>/^\s*[-−+]?\s?\d[\d .,]*\s*$/.test(String(s))?parseNum(s):null;
+
+/* Genskab rækker og kolonner ud fra tekstens placering */
+function buildTable(items){
+  if(!items.length)return [];
+  const hs=items.map(i=>i.y1-i.y0).sort((a,b)=>a-b), mh=hs[hs.length>>1]||8;
+  const rows=[]; items.slice().sort((a,b)=>(a.y0+a.y1)-(b.y0+b.y1)).forEach(it=>{
+    const cy=(it.y0+it.y1)/2, r=rows.find(r=>Math.abs(r.cy-cy)<mh*0.5); if(r){r.items.push(it)}else rows.push({cy,items:[it]})});
+  const cellsByRow=rows.map(r=>{
+    const its=r.items.sort((a,b)=>a.x0-b.x0), cells=[];
+    its.forEach(it=>{const c=cells[cells.length-1]; if(c&&it.x0-c.x1<mh*0.6){c.text+=(it.x0-c.x1>mh*0.12?' ':'')+it.str.trim();c.x1=Math.max(c.x1,it.x1)}else cells.push({x0:it.x0,x1:it.x1,text:it.str.trim()})});
+    return cells;
+  });
+  const cols=[]; cellsByRow.flat().sort((a,b)=>a.x0-b.x0).forEach(c=>{const k=cols.find(k=>Math.abs(k.x-c.x0)<mh*1.3||(c.x0<k.r&&c.x1>k.x));if(k){k.r=Math.max(k.r,c.x1)}else cols.push({x:c.x0,r:c.x1})});
+  cols.sort((a,b)=>a.x-b.x);
+  return cellsByRow.map(cells=>{const row=new Array(cols.length).fill('');cells.forEach(c=>{let bi=0,bd=1e9;cols.forEach((k,i)=>{const d=c.x0>=k.x-1&&c.x0<=k.r?0:Math.abs(k.x-c.x0);if(d<bd){bd=d;bi=i}});row[bi]=row[bi]?row[bi]+' '+c.text:c.text});return row});
+}
+
+/* ---------- udtræk og hurtig sum ---------- */
+async function runExtract(p,r){
+  const items=(await textItems(p.n-1)).filter(it=>{const cx=(it.x0+it.x1)/2,cy=(it.y0+it.y1)/2;return cx>=r.x&&cx<=r.x+r.w&&cy>=r.y&&cy<=r.y+r.h});
+  extractSel={p,r}; extractGrid=buildTable(items); renderAnn(p);
+  const sel=$('xCol'); sel.innerHTML='<option value="">Alle tal</option>'+(extractGrid[0]||[]).map((h,i)=>`<option value="${i}">Kolonne ${i+1}${h&&pureNum(h)==null?' – '+esc(h.slice(0,24)):''}</option>`).join('');
+  updExtract(); if(!items.length)toast('Der er ingen tekst i det markerede område. Er det en scannet tegning?',4200);
+}
+function extractNums(){
+  const c=$('xCol').value, out=[];
+  extractGrid.forEach(row=>row.forEach((cell,i)=>{if(c!==''&&+c!==i)return;const v=parseNum(cell);if(v!=null)out.push(v)}));
+  return out;
+}
+function updExtract(){
+  const has=!!(extractGrid&&extractGrid.length); $('xRes').hidden=!has; $('xHint').hidden=has;
+  if(!has)return;
+  const n=extractNums(), sum=n.reduce((a,b)=>a+b,0), f=v=>v.toLocaleString('da-DK',{maximumFractionDigits:4});
+  $('xStats').innerHTML=[['Antal tal',n.length],['Sum',n.length?f(sum):'–'],['Gennemsnit',n.length?f(sum/n.length):'–'],['Mindste',n.length?f(Math.min(...n)):'–'],['Største',n.length?f(Math.max(...n)):'–']]
+    .map(([k,v])=>`<div><span>${k}</span><b>${v}</b></div>`).join('');
+  $('xTable').innerHTML='<table>'+extractGrid.slice(0,60).map(r=>'<tr>'+r.map(c=>`<td class="${pureNum(c)!=null?'n':''}">${esc(c)}</td>`).join('')+'</tr>').join('')+'</table>'+(extractGrid.length>60?`<p class="pnote">… og ${extractGrid.length-60} rækker mere</p>`:'');
+  $('xInfo').textContent=extractGrid.length+' række'+(extractGrid.length===1?'':'r')+' × '+(extractGrid[0]||[]).length+' kolonne'+((extractGrid[0]||[]).length===1?'':'r');
+}
+$('xCol').onchange=updExtract;
+$('xClear').onclick=()=>{const p=extractSel&&extractSel.p;extractSel=null;extractGrid=null;if(p)renderAnn(p);updExtract()};
+$('xCopy').onclick=async()=>{
+  if(!extractGrid)return; const tsv=extractGrid.map(r=>r.join('\t')).join('\r\n');
+  try{await navigator.clipboard.writeText(tsv);toast('Kopieret. Indsæt i Excel med Ctrl+V.')}
+  catch{const ta=document.createElement('textarea');ta.value=tsv;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast('Kopieret. Indsæt i Excel med Ctrl+V.')}catch{toast('Kunne ikke kopiere. Brug "Gem som Excel-fil".')}ta.remove()}
+};
+function xlsxBlob(sheets){
+  const wb=XLSX.utils.book_new();
+  sheets.forEach(([name,aoa,widths])=>{const ws=XLSX.utils.aoa_to_sheet(aoa);if(widths)ws['!cols']=widths.map(w=>({wch:w}));XLSX.utils.book_append_sheet(wb,ws,name.slice(0,31))});
+  return new Blob([XLSX.write(wb,{type:'array',bookType:'xlsx'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+const safeName=s=>s.replace(/[\\/:*?"<>|]/g,'-');
+async function saveFile(filename,blob,okMsg){
+  if(!downloads){toast('Gem af filer er ikke tilgængeligt i denne visning.');return}
+  try{await downloads.save({filename:safeName(filename),data:blob});toast(okMsg)}catch(err){if(!err||err.code!=='declined')toast('Filen kunne ikke gemmes.')}
+}
+$('xSave').onclick=()=>{
+  if(!extractGrid||typeof XLSX==='undefined')return;
+  const aoa=extractGrid.map(r=>r.map(c=>{const v=pureNum(c);return v!=null?v:c}));
+  saveFile(docName.replace(/\.pdf$/i,'')+' - udtræk side '+(extractSel.p.n)+'.xlsx',xlsxBlob([['Udtræk',aoa]]),'Excel-filen er gemt');
+};
+function extractOverlay(p){
+  if(!extractSel||extractSel.p!==p)return ''; const r=extractSel.r, s=scale;
+  return `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="rgba(31,95,139,.08)" stroke="#1f5f8b" stroke-width="${1.2/s}" stroke-dasharray="${5/s} ${3/s}"/>`;
+}
+
+/* ---------- mængder og beregning (Liste-fanen) ---------- */
+function groupName(a){
+  if(a.kit){const k=loadKit().find(x=>x.id===a.kit);if(k)return k.name}
+  const l=S.layers.find(x=>x.id===a.layer); return l?l.name:'Uden lag';
+}
+function quantities(){
+  const rows={}, add=(key,label,unit,qty)=>{(rows[key]=rows[key]||{key,label,unit,qty:0}).qty+=qty};
+  S.annots.forEach(a=>{
+    const c=annCtx(a.page+1), k=c.scale, real=v=>k?v*k:v*C.PT_MM, lu=k?'m':'mm (papir)', au=k?'m²':'mm² (papir)', g=groupName(a), sfx=k?'':'|p';
+    if(a.type==='measure'||(a.type==='line'&&a.showDim))add('len|'+g+sfx,g+' · længde',lu,real(Math.hypot(a.x2-a.x1,a.y2-a.y1)));
+    else if(a.type==='poly')add('len|'+g+sfx,g+' · længde',lu,real(C.polyLen(a.pts,false)));
+    else if(a.type==='area'){add('area|'+g+sfx,g+' · areal',au,k?C.areaNet(a)*k*k:C.areaNet(a)*C.PT_MM*C.PT_MM);
+      const v=C.volumeM3(a,c); if(v!=null)add((a.vdir==='cut'?'cut|':'fill|')+g,g+' · '+(a.vdir==='cut'?'udgravning':'opbygning'),'m³',v);}
+    else if(a.type==='count'){const gr=S.countGroups.find(x=>x.id===a.group);if(gr)add('cnt|'+gr.id,gr.name,'stk',1)}
+    else if(a.type==='symbol')add('sym|'+(a.name||''),(a.name||'Symbol'),'stk',1);
+  });
+  return Object.values(rows);
+}
+const fmtQ=(v,u)=>v.toLocaleString('da-DK',{maximumFractionDigits:u==='stk'?0:2});
+function renderCalc(){
+  const box=$('calcRows'), rows=quantities(); S.calc=S.calc||{};
+  if(!rows.length){box.innerHTML='<p class="hint">Ingen mængder endnu. Mål, arealer, rumfang, optællinger og symboler samles her automatisk.</p>';$('calcTotal').textContent='';return}
+  box.innerHTML='<table class="calc"><thead><tr><th>Mængde</th><th class="n">Antal</th><th>Pris/faktor</th><th>Enhed</th><th class="n">Resultat</th></tr></thead><tbody>'+rows.map(r=>{
+    const c=S.calc[r.key]||{}, res=c.f!=null&&c.f!==''?r.qty*c.f:null;
+    return `<tr data-k="${esc(r.key)}"><td>${esc(r.label)}</td><td class="n">${fmtQ(r.qty,r.unit)} ${esc(r.unit)}</td><td><input class="num cf" inputmode="decimal" value="${c.f!=null?String(c.f).replace('.',','):''}" aria-label="Pris eller faktor for ${esc(r.label)}"></td><td><input class="num ct" value="${esc(c.t||'')}" placeholder="kr" aria-label="Enhed for resultat" style="font-family:var(--sans)"></td><td class="n">${res!=null?fmtQ(res,'')+' '+esc(c.t||''):''}</td></tr>`}).join('')+'</tbody></table>';
+  const tot={}; rows.forEach(r=>{const c=S.calc[r.key];if(c&&c.f!=null&&c.f!==''){const t=c.t||'';tot[t]=(tot[t]||0)+r.qty*c.f}});
+  $('calcTotal').textContent=Object.keys(tot).length?'I alt: '+Object.entries(tot).map(([t,v])=>fmtQ(v,'')+' '+t).join(' · '):'';
+  box.querySelectorAll('tr[data-k]').forEach(tr=>{
+    const k=tr.dataset.k, cf=tr.querySelector('.cf'), ct=tr.querySelector('.ct');
+    const save=()=>{const v=num(cf.value);S.calc[k]={f:cf.value.trim()===''||!isFinite(v)?null:v,t:ct.value.trim()};persist();renderCalc()};
+    [cf,ct].forEach(i=>{i.addEventListener('change',save);i.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();i.blur()}})});
+  });
+}
 
 /* ---------- sammenlign revisioner ---------- */
 let cmpOther=null, cmpResult=null;
@@ -1964,7 +2160,7 @@ $('btnIn').onclick=zoomIn;$('btnOut').onclick=zoomOut;
 $('btnFitW').onclick=()=>setZoom('width');$('btnFitP').onclick=()=>setZoom('page');
 $('btnRot').onclick=()=>{finishEdit();rot=(rot+90)%360;if(doc)setZoom(fit)};
 $('btnUndo').onclick=undo;$('btnRedo').onclick=redo;
-const KEYTOOLS={v:'select',l:'line',a:'arrow',r:'rect',o:'circle',t:'text',c:'callout',m:'measure',p:'poly',f:'area',k:'count',s:'stamp'};
+const KEYTOOLS={v:'select',l:'line',a:'arrow',r:'rect',o:'circle',t:'text',c:'callout',m:'measure',p:'poly',f:'area',k:'count',s:'stamp',g:'angle',x:'extract'};
 document.addEventListener('keydown',e=>{
   if(!$('scaleBox').hidden||!$('expBox').hidden||!$('setBox').hidden||!$('sigBox').hidden){if(e.key==='Escape'){$('scaleBox').hidden=true;$('expBox').hidden=true;$('setBox').hidden=true;$('sigBox').hidden=true;calib=null}return}
   if(!$('cmpBox').hidden){if(e.key==='Escape')$('cmpBox').hidden=true;return}
@@ -1974,7 +2170,7 @@ document.addEventListener('keydown',e=>{
   if(polyDraw){
     if(e.key==='Enter'){e.preventDefault();finishPoly();return}
     if(e.key==='Backspace'){e.preventDefault();polyDraw.pts.splice(-2,2);if(!polyDraw.pts.length)cancelPoly();else renderAnn(polyDraw.p);return}
-    if(e.key==='Escape'){e.preventDefault();const need=tool==='area'?6:4;if(polyDraw.pts.length>=need)finishPoly();else cancelPoly();return}
+    if(e.key==='Escape'){e.preventDefault();if(tool!=='hole'&&tool!=='angle'&&polyDraw.pts.length>=polyNeed())finishPoly();else{cancelPoly();if(tool==='hole'){const t=holeTarget;holeTarget=null;setTool('select');selId=t;renderAllAnn();updProps()}}return}
   }
   if(tool==='count'&&!selId&&(e.key==='Backspace'||e.key==='Delete')&&countStack.length){e.preventDefault();const id=countStack.pop();if(S.annots.some(a=>a.id===id)){pushHist();S.annots=S.annots.filter(a=>a.id!==id);commit()}return}
   if(/^[1-9]$/.test(e.key)&&!e.ctrlKey&&!e.metaKey&&!e.altKey){const i=+e.key-1;if(loadKit()[i]){e.preventDefault();useKit(i)}return}
