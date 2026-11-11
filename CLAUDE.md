@@ -30,3 +30,9 @@ Saml gerne flere ændringer i én udgivelse.
 - Data gemmes pr. browser: IndexedDB (`files`, `annots`) og localStorage (`bladr:*` – indstillinger, navn, værktøjskasse, underskrifter). Intet sendes til en server.
 - Brugerens egen artifact-udgave og den installerede app har hver deres lager.
 - Hold siden fri for vandret rulning på mobil, og hold farver i tokens på `:root` med mørk tilstand.
+
+## Overbliksdokument
+
+Martin har et Word-dokument `Bladr - overblik.docx` i `C:\Users\mnk96\OneDrive\Claude\Bladr` med: funktioner i Bladr i dag, planlagte funktioner, venteliste (idéer han har valgt at vente med) og mulige huller. Kilden er `tools/overblik/overblik.json`; dokumentet bygges med `node tools/overblik/make.js "<sti>.docx"`.
+
+Hold det opdateret: når en funktion bliver færdig, flyt den fra "planlagt" til "funktioner"; når Martin siger, at en foreslået funktion skal vente, tilføj den på ventelisten med dato og status. Læg derefter det nye dokument i hans mappe (kræver at mappen er forbundet).
