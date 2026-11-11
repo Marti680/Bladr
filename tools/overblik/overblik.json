@@ -1,47 +1,228 @@
 {
  "opdateret": "11.11.2026",
  "funktioner": [
-  ["Læsning og navigation", ["Åbn PDF med knappen, ved at trække filen ind eller fra Windows (Åbn med / standardprogram)", "Liste over de seneste 12 filer, og Bladr husker hvilken side du var nået til", "Søgning i hele dokumentet med fund pr. side", "Miniaturer af siderne", "Zoom (+/−, Ctrl+hjul), tilpas bredde, hel side og rotation af visningen", "Åbner adgangskodebeskyttede PDF'er"]],
-  ["Markering", ["Streg og pil (pilespids i den ene eller begge ender, Shift låser til 45°)", "Ramme med fuld, stiplet eller prikket kant eller som sky", "Cirkel", "Tekstfelt med kant, baggrund og tekststørrelse", "Tekst med pil til et punkt", "Farver, stregtykkelser og gennemsigtig udfyldning", "Vælg, flyt og træk i håndtag; dobbeltklik for at redigere; fortryd og gentag", "Den figur du lige har tegnet er valgt; klik på papiret eller Esc afslutter"]],
-  ["Mål og målestok", ["Målestok som 1:N eller kalibrering ud fra et kendt mål, for én side eller alle sider", "Enheder pr. PDF (m, cm, mm og papirmål) og standard for nye PDF'er, inkl. decimaler", "Målelinje med tværstreger eller pile og mulighed for egen tekst", "Vis mål på streger, rammer og cirkler – placeret langs figuren og kan flyttes", "Polylinje med samlet længde og delmål", "Areal og omkreds", "Figurer ud fra indtastede mål (længde, vinkel, bredde, højde, radius, diameter) i virkelige mål eller papirmål"]],
-  ["Optælling, symboler og stempler", ["Tælleværktøj med grupper (navn, farve og symbol) og optælling pr. side og i alt", "Indsæt optælling som tabel på siden", "Egne symboler fra skærmklip (Ctrl+V) eller billede, med automatisk fjernelse af lys baggrund", "Stempler: Godkendt, Kontrolleret, Som udført, Udbedret, Foreløbig, Ikke godkendt, Afvist eller egen tekst – med navn og dato"]],
-  ["Organisering", ["Lag: tænd/sluk, omdøb, slet, aktivt lag og flyt markeringer mellem lag", "Værktøjskasse med gemte værktøjer og symboler, standardlag, eget lag pr. PDF og taster 1–9", "Markeringsliste med status (Åben, I gang, Udbedret, Afvist), kommentar og forfatter, filter og eksport til Excel (CSV)", "Værktøj-fanen kommer frem automatisk og forsvinder igen med Esc"]],
-  ["Underskrift og sammenligning", ["Underskrift: tegn, skriv dit navn i håndskrift eller brug et billede; op til 6 gemte; dato under", "Sammenlign revisioner: overlejring i farver og automatiske skyer om ændringer i laget \"Ændringer\""]],
-  ["Eksport og deling", ["Samlet PDF med lag (kan slås til og fra i Adobe og Bluebeam), fladt, én PDF pr. lag eller låst billedkopi", "Formularfelter låses ved eksport; dokumenter med underskrift eksporteres fladt", "Udskriv med synlige lag og \"Gem som\"-dialog (i den installerede app)"]],
-  ["Den installerede app", ["Installérbar fra Chrome/Edge via marti680.github.io/Bladr", "Virker offline og kan være standardprogram til PDF", "Logo og filikon i Stifinder (med hjælp under Indstillinger, hvis ikonerne er blanke)", "Besked om ny version med \"Genstart nu\"", "Alle filer og markeringer bliver på den enkelte computer"]]
+  [
+   "Læsning og navigation",
+   [
+    "Åbn PDF med knappen, ved at trække filen ind eller fra Windows (Åbn med / standardprogram)",
+    "Liste over de seneste 12 filer, og Bladr husker hvilken side du var nået til",
+    "Søgning i hele dokumentet med fund pr. side",
+    "Miniaturer af siderne",
+    "Zoom (+/−, Ctrl+hjul), tilpas bredde, hel side og rotation af visningen",
+    "Åbner adgangskodebeskyttede PDF'er"
+   ]
+  ],
+  [
+   "Markering",
+   [
+    "Streg og pil (pilespids i den ene eller begge ender, Shift låser til 45°)",
+    "Ramme med fuld, stiplet eller prikket kant eller som sky",
+    "Cirkel",
+    "Tekstfelt med kant, baggrund og tekststørrelse",
+    "Tekst med pil til et punkt",
+    "Farver, stregtykkelser og gennemsigtig udfyldning",
+    "Vælg, flyt og træk i håndtag; dobbeltklik for at redigere; fortryd og gentag",
+    "Den figur du lige har tegnet er valgt; klik på papiret eller Esc afslutter"
+   ]
+  ],
+  [
+   "Mål og målestok",
+   [
+    "Målestok som 1:N eller kalibrering ud fra et kendt mål, for én side eller alle sider",
+    "Enheder pr. PDF (m, cm, mm og papirmål) og standard for nye PDF'er, inkl. decimaler",
+    "Målelinje med tværstreger eller pile og mulighed for egen tekst",
+    "Vis mål på streger, rammer og cirkler – placeret langs figuren og kan flyttes",
+    "Polylinje med samlet længde og delmål",
+    "Areal og omkreds",
+    "Figurer ud fra indtastede mål (længde, vinkel, bredde, højde, radius, diameter) i virkelige mål eller papirmål",
+    "Huller trukket fra i arealer (nettoareal)",
+    "Vinkelmåling med tre klik",
+    "Rumfang ud fra areal og dybde/højde, vist som udgravning (fx kabelgrav) eller opbygning (fx bygning)"
+   ]
+  ],
+  [
+   "Optælling, symboler og stempler",
+   [
+    "Tælleværktøj med grupper (navn, farve og symbol) og optælling pr. side og i alt",
+    "Indsæt optælling som tabel på siden",
+    "Egne symboler fra skærmklip (Ctrl+V) eller billede, med automatisk fjernelse af lys baggrund",
+    "Stempler: Godkendt, Kontrolleret, Som udført, Udbedret, Foreløbig, Ikke godkendt, Afvist eller egen tekst – med navn og dato",
+    "Find lignende: træk en ramme om ét symbol, og Bladr finder alle magen til, også drejede, på siden eller i hele dokumentet",
+    "Tæl tekst: tæller fx \"S1\" eller \"WC\", evt. kun hele ord",
+    "Ret fejl og mangler med klik, og godkend hver optælling, så den lægges på listen med ✓, før du går videre til den næste"
+   ]
+  ],
+  [
+   "Tal og Excel",
+   [
+    "Udtræk: træk en ramme om tal eller en tabel og se antal, sum, gennemsnit, mindste og største",
+    "Kopiér tabellen til Excel eller gem den som Excel-fil",
+    "Mængder og beregning: længder, arealer, rumfang og optællinger samles pr. lag eller værktøj, og du kan skrive pris eller faktor på",
+    "Markeringslisten gemmes som Excel med faner for markeringer, optælling og mængder"
+   ]
+  ],
+  [
+   "Organisering",
+   [
+    "Lag: tænd/sluk, omdøb, slet, aktivt lag og flyt markeringer mellem lag",
+    "Værktøjskasse med gemte værktøjer og symboler, standardlag, eget lag pr. PDF og taster 1–9",
+    "Markeringsliste med status (Åben, I gang, Udbedret, Afvist), kommentar og forfatter, filter og eksport til Excel",
+    "Værktøj-fanen kommer frem automatisk og forsvinder igen med Esc"
+   ]
+  ],
+  [
+   "Underskrift og sammenligning",
+   [
+    "Underskrift: tegn, skriv dit navn i håndskrift eller brug et billede; op til 6 gemte; dato under",
+    "Sammenlign revisioner: overlejring i farver og automatiske skyer om ændringer i laget \"Ændringer\""
+   ]
+  ],
+  [
+   "Eksport og deling",
+   [
+    "Samlet PDF med lag (kan slås til og fra i Adobe og Bluebeam), fladt, én PDF pr. lag eller låst billedkopi",
+    "Formularfelter låses ved eksport; dokumenter med underskrift eksporteres fladt",
+    "Udskriv med synlige lag og \"Gem som\"-dialog (i den installerede app)",
+    "PDF med redigerbare kommentarer, som andre kan flytte og rette i Bluebeam og Adobe (lagene følger med)",
+    "Kommentarer fra Bluebeam, Adobe m.fl. kan overtages og rettes i Bladr; filen på computeren ændres ikke"
+   ]
+  ],
+  [
+   "Den installerede app",
+   [
+    "Installérbar fra Chrome/Edge via marti680.github.io/Bladr",
+    "Virker offline og kan være standardprogram til PDF",
+    "Logo og filikon i Stifinder (med hjælp under Indstillinger, hvis ikonerne er blanke)",
+    "Besked om ny version med \"Genstart nu\"",
+    "Alle filer og markeringer bliver på den enkelte computer"
+   ]
+  ]
  ],
- "planlagt": [
-  ["Redigerbare PDF-kommentarer", "Eksport som rigtige PDF-kommentarer, så andre kan redigere dem i Bluebeam og Adobe, og import af kommentarer fra andres PDF'er, så du kan se og arbejde videre med dem i Bladr."],
-  ["Find lignende og tæl tekst", "Klik på ét symbol, og Bladr finder alle magen til (også drejede) eller tæller en bestemt tekst. Én ting ad gangen; fejl og manglende kan rettes, og hver optælling godkendes og lægges på en samlet liste, før man går videre til den næste."],
-  ["Huller, vinkler og rumfang", "Træk huller fra i et areal, mål vinkler med tre klik, og få rumfang ud fra areal og højde/dybde – vist som udgravning (fx kabelgrav) eller opbygning (fx bygning, fundament)."],
-  ["Hurtig sum, udtræk til Excel og egne beregninger", "Træk en ramme om tal og se sum, gennemsnit og antal; udtræk en tabel fra PDF'en til en Excel-fil; regn videre på egne mål og optællinger med priser eller faktorer."]
- ],
+ "planlagt": [],
  "venteliste": [
-  ["AI-integration (Claude/ChatGPT)", "a) Udveksling af markeringer via fil, b) AI-panel i Bladr med egen nøgle, c) direkte forbindelse mellem Claude og Bladr. Dokumenter sendes da til AI-udbyderen.", "11.11.2026", "Venter – dit valg"],
-  ["Strengdokumentation fra PVSol", "Genkend moduler på en PVSol-tegning, tegn strenge op pr. inverter/MPPT med farver og løbenumre, signaturforklaring og kontrol af modulantal.", "01.11.2026", "Afventer en eksempel-side fra PVSol. \"Find lignende\" er et første skridt."],
-  ["Signering med tofaktor, mail eller SMS", "Underskrift med kode og revisionsspor (hvem, hvornår, fingeraftryk af dokumentet). Intern version via login er mulig; mod eksterne kræver det en server.", "31.10.2026", "Kun undersøgt"],
-  ["Billedkopi med søgbar tekst", "Låst billedkopi med usynlig tekst bagved, så man stadig kan søge og kopiere.", "31.10.2026", "Foreslået, ikke valgt"],
-  ["Eksport/import af markeringer og værktøjskasse", "Flyt markeringer, gemte værktøjer, symboler og underskrifter mellem testudgaven, den installerede app og andre computere.", "01.11.2026", "Foreslået, ikke valgt"],
-  ["Gruppe af markeringer som symbol", "Markér flere ting på én gang (fx kasse, tekst og pil) og gem dem som ét symbol. Kræver at man kan vælge flere markeringer.", "01.11.2026", "Ikke bygget endnu"],
-  ["Microsoft Store", "Bladr i Store som skjult app med direkte link: installation uden advarsler, filikoner automatisk, opdateringer som nu.", "02.11.2026", "Overvejet – start med Edge-test"],
-  ["Test af installation fra Edge", "Se om Edge giver korrekte filikoner uden script.", "02.11.2026", "Ikke testet"],
-  ["Eget Windows-program (.exe)", "Selvstændigt program med installer, der selv registrerer filikoner.", "01.11.2026", "Fravalgt – Windows-advarsel uden betalt certifikat"],
-  ["Adgangsbegrænsning med e-mail", "Kun godkendte e-mailadresser kan åbne Bladr (fx Cloudflare Access).", "01.11.2026", "Fravalgt – offentligt link er fint"],
-  ["Optælling på billeder og scanninger", "Find lignende på pixelniveau, når tegningen ikke er vektor.", "11.11.2026", "Fravalgt som første trin"],
-  ["Tekstgenkendelse (OCR)", "Søg og udtræk tekst fra scannede PDF'er.", "11.11.2026", "Nævnt som begrænsning"],
-  ["Bedre baggrundsfjernelse på symboler", "Fjern farvede eller ujævne baggrunde, ikke kun lyse.", "01.11.2026", "Begrænsning"]
+  [
+   "AI-integration (Claude/ChatGPT)",
+   "a) Udveksling af markeringer via fil, b) AI-panel i Bladr med egen nøgle, c) direkte forbindelse mellem Claude og Bladr. Dokumenter sendes da til AI-udbyderen.",
+   "11.11.2026",
+   "Venter – dit valg"
+  ],
+  [
+   "Strengdokumentation fra PVSol",
+   "Genkend moduler på en PVSol-tegning, tegn strenge op pr. inverter/MPPT med farver og løbenumre, signaturforklaring og kontrol af modulantal.",
+   "01.11.2026",
+   "Afventer en eksempel-side fra PVSol. \"Find lignende\" er et første skridt."
+  ],
+  [
+   "Signering med tofaktor, mail eller SMS",
+   "Underskrift med kode og revisionsspor (hvem, hvornår, fingeraftryk af dokumentet). Intern version via login er mulig; mod eksterne kræver det en server.",
+   "31.10.2026",
+   "Kun undersøgt"
+  ],
+  [
+   "Billedkopi med søgbar tekst",
+   "Låst billedkopi med usynlig tekst bagved, så man stadig kan søge og kopiere.",
+   "31.10.2026",
+   "Foreslået, ikke valgt"
+  ],
+  [
+   "Eksport/import af markeringer og værktøjskasse",
+   "Flyt markeringer, gemte værktøjer, symboler og underskrifter mellem testudgaven, den installerede app og andre computere.",
+   "01.11.2026",
+   "Foreslået, ikke valgt"
+  ],
+  [
+   "Gruppe af markeringer som symbol",
+   "Markér flere ting på én gang (fx kasse, tekst og pil) og gem dem som ét symbol. Kræver at man kan vælge flere markeringer.",
+   "01.11.2026",
+   "Ikke bygget endnu"
+  ],
+  [
+   "Microsoft Store",
+   "Bladr i Store som skjult app med direkte link: installation uden advarsler, filikoner automatisk, opdateringer som nu.",
+   "02.11.2026",
+   "Overvejet – start med Edge-test"
+  ],
+  [
+   "Test af installation fra Edge",
+   "Se om Edge giver korrekte filikoner uden script.",
+   "02.11.2026",
+   "Ikke testet"
+  ],
+  [
+   "Eget Windows-program (.exe)",
+   "Selvstændigt program med installer, der selv registrerer filikoner.",
+   "01.11.2026",
+   "Fravalgt – Windows-advarsel uden betalt certifikat"
+  ],
+  [
+   "Adgangsbegrænsning med e-mail",
+   "Kun godkendte e-mailadresser kan åbne Bladr (fx Cloudflare Access).",
+   "01.11.2026",
+   "Fravalgt – offentligt link er fint"
+  ],
+  [
+   "Optælling på billeder og scanninger",
+   "Find lignende på pixelniveau, når tegningen ikke er vektor.",
+   "11.11.2026",
+   "Fravalgt som første trin"
+  ],
+  [
+   "Tekstgenkendelse (OCR)",
+   "Søg og udtræk tekst fra scannede PDF'er.",
+   "11.11.2026",
+   "Nævnt som begrænsning"
+  ],
+  [
+   "Bedre baggrundsfjernelse på symboler",
+   "Fjern farvede eller ujævne baggrunde, ikke kun lyse.",
+   "01.11.2026",
+   "Begrænsning"
+  ]
  ],
  "huller": [
-  ["Fremhæv, overstreg og understreg tekst", "De mest almindelige kommentarer i Adobe; bruges meget ved gennemlæsning af beskrivelser og kontrakter."],
-  ["Frihåndstegning", "Hurtige skitser og kringler, fx på tablet."],
-  ["Udfyld PDF-formularer", "Bladr kan låse formularfelter, men ikke udfylde dem."],
-  ["Klikbare links og indholdsfortegnelse", "Links i PDF'en og bogmærker (indholdsfortegnelsen i siden) vises ikke i dag."],
-  ["Sidehåndtering", "Indsæt, slet, drej, flyt, flet og udtræk sider."],
-  ["Fastgør til streger og hjørner (snap)", "Mere præcise mål, når man klikker på tegningens egne linjer."],
-  ["Flere skalaer på samme side", "Fx plan og snit på samme ark med hver sin målestok."],
-  ["Flere dokumenter åbne på én gang", "Faner med flere PDF'er."],
-  ["Sikkerhedskopi og synkronisering", "Markeringer og værktøjskasse ligger kun på den enkelte computer."],
-  ["Svar på markeringer", "Samtaletråde på en markering, som i Bluebeam og Adobe."],
-  ["Oversigt over tastaturgenveje", "En hjælpeside med alle genveje."]
+  [
+   "Fremhæv, overstreg og understreg tekst",
+   "De mest almindelige kommentarer i Adobe; bruges meget ved gennemlæsning af beskrivelser og kontrakter."
+  ],
+  [
+   "Frihåndstegning",
+   "Hurtige skitser og kringler, fx på tablet."
+  ],
+  [
+   "Udfyld PDF-formularer",
+   "Bladr kan låse formularfelter, men ikke udfylde dem."
+  ],
+  [
+   "Klikbare links og indholdsfortegnelse",
+   "Links i PDF'en og bogmærker (indholdsfortegnelsen i siden) vises ikke i dag."
+  ],
+  [
+   "Sidehåndtering",
+   "Indsæt, slet, drej, flyt, flet og udtræk sider."
+  ],
+  [
+   "Fastgør til streger og hjørner (snap)",
+   "Mere præcise mål, når man klikker på tegningens egne linjer."
+  ],
+  [
+   "Flere skalaer på samme side",
+   "Fx plan og snit på samme ark med hver sin målestok."
+  ],
+  [
+   "Flere dokumenter åbne på én gang",
+   "Faner med flere PDF'er."
+  ],
+  [
+   "Sikkerhedskopi og synkronisering",
+   "Markeringer og værktøjskasse ligger kun på den enkelte computer."
+  ],
+  [
+   "Svar på markeringer",
+   "Samtaletråde på en markering, som i Bluebeam og Adobe."
+  ],
+  [
+   "Oversigt over tastaturgenveje",
+   "En hjælpeside med alle genveje."
+  ]
  ]
 }

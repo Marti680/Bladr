@@ -1,5 +1,5 @@
 /* Bladr service worker: gør appen tilgængelig offline og giver besked om nye versioner. */
-const VERSION = '2026.11.11-1923';
+const VERSION = '2026.11.11-1930';
 const CACHE = 'bladr-' + VERSION;
 const ASSETS = [
   './', 'index.html', 'pwa.js', 'manifest.webmanifest',

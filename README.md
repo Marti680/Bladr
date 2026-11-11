@@ -35,10 +35,13 @@ Når der kommer en ny version, viser Bladr en besked øverst: *"Der er en ny ver
 
 - Læs, søg, zoom, rotér, miniaturer og liste over seneste filer
 - Streg, pil, ramme, cirkel, sky, tekstfelt, tekst med pil
-- Målestok (1:N eller kalibrering), mål, polylinje med længde, areal og omkreds
+- Målestok (1:N eller kalibrering), mål, polylinje med længde, areal og omkreds, huller i arealer, vinkler og rumfang (udgravning eller opbygning)
 - Lag, der kan slås til og fra og eksporteres samlet (som rigtige PDF-lag) eller hver for sig
-- Optælling i grupper, stempler, egne symboler fra skærmklip (Ctrl+V)
-- Markeringsliste med status og kommentar, eksport til Excel (CSV)
+- Optælling i grupper med Find lignende (ens symboler) og Tæl tekst, rettelser og godkendelse, stempler, egne symboler fra skærmklip (Ctrl+V)
+- Udtræk af tal og tabeller med hurtig sum, gem som Excel
+- Mængder med egne priser eller faktorer
+- Markeringsliste med status og kommentar, eksport til Excel
+- PDF-kommentarer: eksport som redigerbare kommentarer til Bluebeam og Adobe, og overtagelse af kommentarer fra dem
 - Værktøjskasse med gemte værktøjer og standardlag
 - Sammenligning af revisioner med skyer om ændringer
 - Underskrift (tegnet, skrevet eller fra billede) og låsning af formularfelter ved eksport
@@ -48,4 +51,4 @@ Når der kommer en ny version, viser Bladr en besked øverst: *"Der er en ny ver
 
 Se [CLAUDE.md](CLAUDE.md). Kort fortalt: kilden ligger i `src/`, og `python3 tools/build.py` bygger den installérbare udgave til `docs/` (som GitHub Pages viser) og Claude-artifact-udgaven til `dist/`.
 
-Bladr bruger [PDF.js](https://mozilla.github.io/pdf.js/) (Apache 2.0) og [pdf-lib](https://pdf-lib.js.org/) (MIT). Licenserne ligger i `docs/vendor/`.
+Bladr bruger [PDF.js](https://mozilla.github.io/pdf.js/) (Apache 2.0), [pdf-lib](https://pdf-lib.js.org/) (MIT) og [SheetJS](https://sheetjs.com/) (Apache 2.0). Licenserne ligger i `docs/vendor/`.

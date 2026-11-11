@@ -11,7 +11,7 @@ Bladr er Martins egen PDF-læser og markeringsværktøj. Al brugerflade og tekst
 - `src/sample.pdf` – eksempeldokumentet, der vises første gang.
 - `tools/build.py` – bygger `docs/` (GitHub Pages, installérbar app) og `dist/artifact.html` (Claude-artifact).
 - `tools/make_icons.py` – tegner app-ikonerne i `docs/icons/`.
-- `docs/vendor/` – PDF.js 3.11.174 og pdf-lib 1.17.1 (lokale kopier, så appen virker offline). Skal matche versionerne på cdnjs i `src/app.html`.
+- `docs/vendor/` – PDF.js 3.11.174, pdf-lib 1.17.1 og SheetJS (xlsx) 0.18.5 (lokale kopier, så appen virker offline). Skal matche versionerne på cdnjs i `src/app.html`.
 
 ## Arbejdsgang
 

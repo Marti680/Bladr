@@ -309,7 +309,7 @@ async function buildPdf(PDFLib, bytes, opts){
   const prevMeasure = measureFn; measureFn = (s, size, bold) => (bold ? fontB : font).widthOfTextAtSize(clean(String(s)), size);
   try{
   const ocg = {};
-  if(opts.mode === 'ocg'){
+  if(opts.mode === 'ocg' || opts.mode === 'annot'){
     const refs = opts.layers.map(l => (ocg[l.id] = ctx.register(ctx.obj({Type:'OCG', Name: PDFHexString.fromText(l.name)}))));
     let ocp = pdf.catalog.lookup(PDFName.of('OCProperties'));
     if(ocp instanceof PDFDict){
@@ -327,12 +327,41 @@ async function buildPdf(PDFLib, bytes, opts){
   const pages = pdf.getPages(), imgs = {};
   for(let i=0;i<pages.length;i++) for(const l of opts.layers) for(const a of opts.annotsFor(i, l.id))
     if((a.type==='sign'||a.type==='symbol') && a.src && !imgs[a.src]) imgs[a.src] = await pdf.embedPng(b64Bytes(a.src));
+  const asAnnot = a => opts.mode === 'annot' && a.type !== 'sign';
+  /* tegneoperatorer for primitiver; R giver navnene på skrift, gennemsigtighed og billeder */
+  const primOps = (p, R, ops) => {
+    if(p.k === 'image'){
+      ops.push(L.pushGraphicsState(), L.concatTransformationMatrix(p.w,0,0,-p.h,p.x,p.y+p.h), L.drawObject(R.img(p.src)), L.popGraphicsState());
+      return;
+    }
+    if(p.k === 'text'){
+      ops.push(L.pushGraphicsState(), L.setFillingRgbColor(...hexRgb(p.color)), L.beginText(), L.setFontAndSize(p.bold ? R.fontB : R.font, p.size),
+        L.setTextMatrix(Math.cos(p.rot||0),Math.sin(p.rot||0),Math.sin(p.rot||0),-Math.cos(p.rot||0),p.x,p.y), L.showText((p.bold ? fontB : font).encodeText(clean(p.str))), L.endText(), L.popGraphicsState());
+      return;
+    }
+    ops.push(L.pushGraphicsState());
+    if(p.stroke){ ops.push(L.setStrokingRgbColor(...hexRgb(p.stroke)), L.setLineWidth(p.width), L.setLineCap(p.cap ? L.LineCapStyle.Round : L.LineCapStyle.Butt), L.setDashPattern(p.dash || [], 0)); }
+    if(p.fill) ops.push(L.setFillingRgbColor(...hexRgb(p.fill)));
+    if(p.fill && p.op && p.op < 1) ops.push(L.setGraphicsState(R.gs));
+    p.ops.forEach(o => {
+      if(o[0]==='M') ops.push(L.moveTo(o[1],o[2])); else if(o[0]==='L') ops.push(L.lineTo(o[1],o[2]));
+      else if(o[0]==='C') ops.push(L.appendBezierCurve(o[1],o[2],o[3],o[4],o[5],o[6])); else ops.push(L.closePath());
+    });
+    ops.push(p.evenOdd && p.fill ? PDFOperator.of(p.stroke ? 'B*' : 'f*', []) : p.fill && p.stroke ? L.fillAndStroke() : p.fill ? L.fill() : L.stroke());
+    ops.push(L.popGraphicsState());
+  };
   for(let i=0;i<pages.length;i++){
-    const groups = opts.layers.map(l => ({l, as: opts.annotsFor(i, l.id)})).filter(g => g.as.length);
-    if(!groups.length) continue;
+    const all = opts.layers.map(l => ({l, as: opts.annotsFor(i, l.id)})).filter(g => g.as.length);
+    if(!all.length) continue;
     const pg = pages[i], node = pg.node; node.normalize();
     const info = opts.pageInfo(i);
+    if(opts.mode === 'annot') all.forEach(g => g.as.filter(asAnnot).forEach(a => {
+      const ref = makeAnnot(a, info, ocg[g.l.id], g.l); if(ref) node.addAnnot(ref);
+    }));
+    const groups = all.map(g => ({l:g.l, as:g.as.filter(a => !asAnnot(a))})).filter(g => g.as.length);
+    if(!groups.length) continue;
     const fontKey = node.newFontDictionary('BladrHelv', font.ref), fontKeyB = node.newFontDictionary('BladrHelvB', fontB.ref), gsKey = node.newExtGState('BladrGS', gsRef);
+    const R = {font:fontKey, fontB:fontKeyB, gs:gsKey, img: src => node.newXObject('BladrImg', imgs[src].ref)};
     const start = ctx.register(ctx.contentStream([L.pushGraphicsState()])), end = ctx.register(ctx.contentStream([L.popGraphicsState()]));
     node.wrapContentStreams(start, end);
     const ops = [L.pushGraphicsState(), L.concatTransformationMatrix(...invert(info.transform)), L.setLineJoin(L.LineJoinStyle.Round)];
@@ -343,35 +372,156 @@ async function buildPdf(PDFLib, bytes, opts){
         const key = 'BladrOC' + gi; props.set(PDFName.of(key), ocg[g.l.id]);
         ops.push(PDFOperator.of('BDC', [PDFName.of('OC'), PDFName.of(key)]));
       }
-      g.as.forEach(a => prims(a, info).forEach(p => {
-        if(p.k === 'image'){
-          const nm = node.newXObject('BladrImg', imgs[p.src].ref);
-          ops.push(L.pushGraphicsState(), L.concatTransformationMatrix(p.w,0,0,-p.h,p.x,p.y+p.h), L.drawObject(nm), L.popGraphicsState());
-          return;
-        }
-        if(p.k === 'text'){
-          ops.push(L.pushGraphicsState(), L.setFillingRgbColor(...hexRgb(p.color)), L.beginText(), L.setFontAndSize(p.bold ? fontKeyB : fontKey, p.size),
-            L.setTextMatrix(Math.cos(p.rot||0),Math.sin(p.rot||0),Math.sin(p.rot||0),-Math.cos(p.rot||0),p.x,p.y), L.showText((p.bold ? fontB : font).encodeText(clean(p.str))), L.endText(), L.popGraphicsState());
-          return;
-        }
-        ops.push(L.pushGraphicsState());
-        if(p.stroke){ ops.push(L.setStrokingRgbColor(...hexRgb(p.stroke)), L.setLineWidth(p.width), L.setLineCap(p.cap ? L.LineCapStyle.Round : L.LineCapStyle.Butt), L.setDashPattern(p.dash || [], 0)); }
-        if(p.fill) ops.push(L.setFillingRgbColor(...hexRgb(p.fill)));
-        if(p.fill && p.op && p.op < 1) ops.push(L.setGraphicsState(gsKey));
-        p.ops.forEach(o => {
-          if(o[0]==='M') ops.push(L.moveTo(o[1],o[2])); else if(o[0]==='L') ops.push(L.lineTo(o[1],o[2]));
-          else if(o[0]==='C') ops.push(L.appendBezierCurve(o[1],o[2],o[3],o[4],o[5],o[6])); else ops.push(L.closePath());
-        });
-        ops.push(p.evenOdd && p.fill ? PDFOperator.of(p.stroke ? 'B*' : 'f*', []) : p.fill && p.stroke ? L.fillAndStroke() : p.fill ? L.fill() : L.stroke());
-        ops.push(L.popGraphicsState());
-      }));
+      g.as.forEach(a => prims(a, info).forEach(p => primOps(p, R, ops)));
       if(ocg[g.l.id]) ops.push(PDFOperator.of('EMC', []));
     });
     ops.push(L.popGraphicsState());
     pg.pushOperators(...ops);
   }
+
+  /* Redigerbar PDF-kommentar med Bladrs eget udseende (AP) og data til at hente den tilbage */
+  function makeAnnot(a, info, ocRef, layer){
+    const ps = prims(a, info); if(!ps.length) return null;
+    const inv = invert(info.transform), U = (x,y) => [inv[0]*x+inv[2]*y+inv[4], inv[1]*x+inv[3]*y+inv[5]];
+    let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; const grow = (x,y,pad) => { x0=Math.min(x0,x-pad); x1=Math.max(x1,x+pad); y0=Math.min(y0,y-pad); y1=Math.max(y1,y+pad); };
+    ps.forEach(p => {
+      if(p.k === 'path'){ const pad = (p.stroke ? p.width/2 : 0) + 0.5; p.ops.forEach(o => { for(let k=1;k<o.length;k+=2) grow(o[k],o[k+1],pad); }); }
+      else if(p.k === 'image') { grow(p.x,p.y,0); grow(p.x+p.w,p.y+p.h,0); }
+      else { const w = measureFn(p.str, p.size, p.bold), c = Math.cos(p.rot||0), s = Math.sin(p.rot||0);
+        [[0,-p.size],[w,-p.size],[w,p.size*0.3],[0,p.size*0.3]].forEach(([u,v]) => grow(p.x+u*c-v*s, p.y+u*s+v*c, 0.5)); }
+    });
+    const userBox = (bx0,by0,bx1,by1) => { const q = [U(bx0,by0),U(bx1,by0),U(bx1,by1),U(bx0,by1)];
+      return [Math.min(...q.map(p=>p[0])), Math.min(...q.map(p=>p[1])), Math.max(...q.map(p=>p[0])), Math.max(...q.map(p=>p[1]))]; };
+    const rect = userBox(x0,y0,x1,y1);
+    const res = {Font:{BH:font.ref, BHB:fontB.ref}, ExtGState:{BGS:gsRef}, XObject:{}};
+    let ni = 0; const R = {font:PDFName.of('BH'), fontB:PDFName.of('BHB'), gs:PDFName.of('BGS'), img: src => { const n = 'BI'+(ni++); res.XObject[n] = imgs[src].ref; return PDFName.of(n); }};
+    const ops = [L.concatTransformationMatrix(...inv), L.setLineJoin(L.LineJoinStyle.Round)];
+    ps.forEach(p => primOps(p, R, ops));
+    const ap = ctx.register(ctx.formXObject(ops, {BBox: rect, Resources: res}));
+    const col = hexRgb(a.color || '#e03131'), w = a.width || 1, now = new Date(a.modified || a.created || Date.now());
+    const txt = s => PDFHexString.fromText(String(s||''));
+    const d = {Type:'Annot', Rect:rect, F:4, AP:{N:ap}, NM:txt('bladr-'+a.id), T:txt(a.author||''), M:L.PDFString.fromDate(now), CreationDate:L.PDFString.fromDate(new Date(a.created||Date.now())),
+      C:col, Contents:txt(opts.contentsOf ? opts.contentsOf(a) : (a.note||'')), Subj:txt(opts.subjOf ? opts.subjOf(a) : a.type)};
+    if(ocRef) d.OC = ocRef;
+    const bs = {W: a.dash==='none' ? 0 : w, S: a.dash==='dash'||a.dash==='dot' ? 'D' : 'S'}; if(bs.S==='D') bs.D = dashFor(a).arr.map(v => Math.max(0.5, v));
+    const fo = fillOf(a, a.color||'#000000');
+    const inset = (bx,by,bw,bh) => { const r = userBox(bx,by,bx+bw,by+bh); return [r[0]-rect[0], r[1]-rect[1], rect[2]-r[2], rect[3]-r[3]].map(v => Math.max(0, v)); };
+    const flat = arr => { const o = []; for(let k=0;k<arr.length;k+=2) o.push(...U(arr[k],arr[k+1])); return o; };
+    const t = a.type;
+    if(t==='line' || t==='measure'){
+      Object.assign(d, {Subtype:'Line', L:[...U(a.x1,a.y1), ...U(a.x2,a.y2)], BS:bs, IC:col});
+      d.LE = t==='measure' ? (a.ends==='arrow' ? ['ClosedArrow','ClosedArrow'] : ['Butt','Butt']) : [a.arrowStart?'ClosedArrow':'None', a.arrowEnd?'ClosedArrow':'None'];
+    } else if(t==='rect' || t==='circle'){
+      const b = t==='rect' ? {x:a.x,y:a.y,w:a.w,h:a.h} : {x:a.cx-a.r,y:a.cy-a.r,w:2*a.r,h:2*a.r};
+      Object.assign(d, {Subtype: t==='rect' ? 'Square' : 'Circle', BS:bs, RD:inset(b.x,b.y,b.w,b.h)});
+      if(fo.fill) d.IC = hexRgb(fo.fill);
+      if(a.dash==='cloud') d.BE = {S:'C', I:1};
+    } else if(t==='poly' || t==='area' || t==='angle'){
+      Object.assign(d, {Subtype: t==='area' ? 'Polygon' : 'PolyLine', Vertices: flat(a.pts||[]), BS:bs});
+      if(t==='area' && fo.fill) d.IC = hexRgb(fo.fill);
+      if(t==='area' && a.dash==='cloud') d.BE = {S:'C', I:1};
+    } else if(t==='text'){
+      const b = textBox(a), tc = hexRgb(a.textColor || a.color || '#000000');
+      Object.assign(d, {Subtype:'FreeText', BS:bs, DA:L.PDFString.of(`/Helv ${a.size} Tf ${tc.map(v=>+v.toFixed(3)).join(' ')} rg`), Contents:txt(a.text), RD:inset(b.x,b.y,b.w,b.h)});
+      d.C = fo.fill ? hexRgb(fo.fill) : [];
+      if(a.leader){ const e = edgePoint(b, a.leader.x, a.leader.y) || [b.x, b.y+b.h/2]; d.IT = 'FreeTextCallout'; d.CL = [...U(a.leader.x,a.leader.y), ...U(e[0],e[1])]; d.LE = 'ClosedArrow'; }
+    } else {
+      Object.assign(d, {Subtype:'Stamp', Name: t==='count' ? 'Bladr#20Count' : 'Bladr'});
+    }
+    const data = {v:1, a:Object.assign({}, a), layer: layer && layer.name};
+    if(t==='count'){ const g = (info.groups||[]).find(x => x.id===a.group); if(g) data.group = g; }
+    d.BladrData = txt(JSON.stringify(data));
+    const dict = ctx.obj(d);
+    if(d.Subtype==='Stamp') dict.set(PDFName.of('Name'), PDFName.of(t==='count' ? 'BladrCount' : 'Bladr'));
+    return ctx.register(dict);
+  }
   return await pdf.save();
   } finally { measureFn = prevMeasure; }
+}
+
+/* ---------- PDF-kommentarer ind i Bladr ----------
+   Læser kommentarer (Bluebeam, Adobe m.fl.) og laver dem om til Bladr-markeringer i visningsrum.
+   transforms[i] er sidens visnings-transform (PDF-rum -> visningsrum ved zoom 1).
+   Returnerer {items:[{page, a, layer, group}], skipped, bytes}: bytes er PDF'en uden de overtagne kommentarer. */
+const IMPORTABLE = ['Line','Square','Circle','Polygon','PolyLine','FreeText','Ink','Text','Highlight','Underline','StrikeOut','Squiggly','Stamp'];
+async function readAnnots(PDFLib, bytes, transforms, o){
+  o = o || {}; const L = PDFLib, {PDFDocument, PDFName, PDFDict, PDFArray, PDFNumber, PDFString, PDFHexString, PDFRef} = L;
+  const pdf = await PDFDocument.load(bytes, {updateMetadata:false, ignoreEncryption:true}), ctx = pdf.context;
+  const N = k => PDFName.of(k), get = (d,k) => d.lookup(N(k));
+  const str = v => (v instanceof PDFString || v instanceof PDFHexString) ? v.decodeText() : '';
+  const nm = v => v instanceof PDFName ? v.decodeText() : '';
+  const nums = v => v instanceof PDFArray ? v.asArray().map(x => { x = ctx.lookup(x); return x instanceof PDFNumber ? x.asNumber() : 0; }) : null;
+  const hex = c => { if(!c || !c.length) return null; let r,g,b; if(c.length===1) r=g=b=c[0]; else if(c.length===3) [r,g,b]=c; else if(c.length===4){ const k=c[3]; r=(1-c[0])*(1-k); g=(1-c[1])*(1-k); b=(1-c[2])*(1-k); } else return null;
+    return '#'+[r,g,b].map(v => Math.round(Math.max(0,Math.min(1,v))*255).toString(16).padStart(2,'0')).join(''); };
+  const date = s => { const m = /D:(\d{4})(\d\d)?(\d\d)?(\d\d)?(\d\d)?(\d\d)?/.exec(s||''); if(!m) return null; return new Date(+m[1], (+m[2]||1)-1, +m[3]||1, +m[4]||0, +m[5]||0, +m[6]||0).getTime(); };
+  const items = []; let skipped = 0, changed = false;
+  pdf.getPages().forEach((pg, pi) => {
+    const arr = pg.node.lookup(N('Annots'));
+    if(!(arr instanceof PDFArray)) return;
+    const T = transforms[pi], V = (x,y) => [T[0]*x+T[2]*y+T[4], T[1]*x+T[3]*y+T[5]];
+    const VB = r => { const q = [V(r[0],r[1]),V(r[2],r[1]),V(r[2],r[3]),V(r[0],r[3])]; const xs=q.map(p=>p[0]), ys=q.map(p=>p[1]); return {x:Math.min(...xs), y:Math.min(...ys), w:Math.max(...xs)-Math.min(...xs), h:Math.max(...ys)-Math.min(...ys)}; };
+    const pts = v => { const n = nums(v)||[], out = []; for(let k=0;k+1<n.length;k+=2) out.push(...V(n[k],n[k+1])); return out; };
+    const drop = new Set(), entries = arr.asArray();
+    entries.forEach(entry => {
+      const d = ctx.lookup(entry); if(!(d instanceof PDFDict)) return;
+      const st = nm(get(d,'Subtype')); if(st==='Popup' || st==='Link' || st==='Widget') return;
+      const conv = convert(d, st);
+      if(!conv){ if(IMPORTABLE.includes(st) || nm(get(d,'Subtype'))) skipped++; return; }
+      conv.page = pi; items.push(conv); drop.add(String(entry));
+      const pop = d.get(N('Popup')); if(pop) drop.add(String(pop));
+    });
+    if(!drop.size) return;
+    entries.forEach(entry => { const d = ctx.lookup(entry); if(d instanceof PDFDict){ const par = d.get(N('Parent')); if(par && drop.has(String(par)) && nm(get(d,'Subtype'))==='Popup') drop.add(String(entry)); } });
+    pg.node.set(N('Annots'), ctx.obj(entries.filter(e => !drop.has(String(e)))));
+    changed = true;
+
+    function convert(d, st){
+      const bd = get(d,'BladrData');
+      const ocg = get(d,'OC'), layer = ocg instanceof PDFDict ? str(get(ocg,'Name')) : '';
+      if(bd){ try{ const j = JSON.parse(str(bd)); if(j && j.a) return {a:j.a, layer:j.layer||layer, group:j.group||null, own:true}; }catch(e){} }
+      if(!IMPORTABLE.includes(st) || st==='Stamp') return null;
+      const rect = nums(get(d,'Rect')); if(!rect) return null;
+      const color = hex(nums(get(d,'C'))) || '#e03131', bs = get(d,'BS'), bsd = bs instanceof PDFDict ? bs : null;
+      let width = bsd && get(bsd,'W') instanceof PDFNumber ? get(bsd,'W').asNumber() : (nums(get(d,'Border'))||[0,0,1])[2]; if(!(width>=0)) width = 1;
+      const be = get(d,'BE'), cloud = be instanceof PDFDict && nm(get(be,'S'))==='C';
+      const dash = cloud ? 'cloud' : width===0 ? 'none' : bsd && nm(get(bsd,'S'))==='D' ? 'dash' : 'solid';
+      const ic = hex(nums(get(d,'IC'))), fill = ic ? (ic==='#ffffff' ? 'white' : 'tint') : 'none';
+      const note = str(get(d,'Contents')), base = {color, width:Math.max(0.5,width||1), dash, author:str(get(d,'T')), created:date(str(get(d,'CreationDate')))||date(str(get(d,'M')))||Date.now()};
+      const rd = nums(get(d,'RD')) || [0,0,0,0], inner = [rect[0]+rd[0], rect[1]+rd[1], rect[2]-rd[2], rect[3]-rd[3]];
+      let a = null;
+      if(st==='Line'){ const l = nums(get(d,'L')); if(!l) return null; const p1 = V(l[0],l[1]), p2 = V(l[2],l[3]), le = get(d,'LE'), les = le instanceof PDFArray ? le.asArray().map(x => nm(x)) : [];
+        const arrow = x => /Arrow/.test(x||'');
+        a = get(d,'Measure') ? Object.assign(base, {type:'measure', x1:p1[0], y1:p1[1], x2:p2[0], y2:p2[1], ends:arrow(les[0])||arrow(les[1])?'arrow':'tick', note})
+          : Object.assign(base, {type:'line', x1:p1[0], y1:p1[1], x2:p2[0], y2:p2[1], arrowStart:arrow(les[0]), arrowEnd:arrow(les[1]), note}); }
+      else if(st==='Square'){ const b = VB(inner); a = Object.assign(base, {type:'rect', x:b.x, y:b.y, w:b.w, h:b.h, fill, note}); }
+      else if(st==='Circle'){ const b = VB(inner); a = Object.assign(base, {type:'circle', cx:b.x+b.w/2, cy:b.y+b.h/2, r:Math.max(1,(b.w+b.h)/4), fill, note}); }
+      else if(st==='Polygon' || st==='PolyLine'){ const p = pts(get(d,'Vertices')); if(p.length < 4) return null;
+        a = Object.assign(base, {type: st==='Polygon' ? 'area' : 'poly', pts:p, note}, st==='Polygon' ? {fill, showDim:false} : {}); if(st==='Polygon' && dash==='cloud') a.dash = 'cloud'; }
+      else if(st==='Ink'){ const ink = get(d,'InkList'); if(!(ink instanceof PDFArray)) return null; const list = ink.asArray().map(x => pts(ctx.lookup(x))).filter(p => p.length >= 4);
+        if(!list.length) return null; return {multi: list.map(p => Object.assign({}, base, {type:'poly', pts:p, note, dash: dash==='cloud'?'solid':dash})), layer}; }
+      else if(st==='FreeText'){
+        const da = str(get(d,'DA')), fs = /([\d.]+)\s+Tf/.exec(da), rg = /([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+rg/.exec(da), g1 = /([\d.]+)\s+g\b/.exec(da);
+        const tcol = rg ? hex([+rg[1],+rg[2],+rg[3]]) : g1 ? hex([+g1[1]]) : '#000000', bg = hex(nums(get(d,'C')));
+        const size = Math.max(6, Math.min(72, fs ? +fs[1] || 10 : 10)), b = VB(inner);
+        const rc = str(get(d,'RC')).replace(/<[^>]+>/g,''), text = (note || rc).replace(/\r\n?/g,'\n');
+        a = Object.assign(base, {type:'text', x:b.x, y:b.y, text, size, color: width===0 ? tcol : color, textColor:tcol, width:Math.max(0.5,width||1), dash: width===0 ? 'none' : dash==='none'?'solid':dash, fill: bg ? (bg==='#ffffff' ? 'white' : bg==='#fff3a8'||/^#ff[ef]/.test(bg) ? 'yellow' : 'white') : 'none'});
+        if(!bsd && !get(d,'Border')){ a.dash = 'none'; a.color = tcol; }
+        const cl = nums(get(d,'CL')); if(cl && cl.length >= 4){ const tip = V(cl[0],cl[1]); a.leader = {x:tip[0], y:tip[1]}; }
+      }
+      else if(st==='Text'){ const b = VB(rect); a = Object.assign(base, {type:'text', x:b.x, y:b.y, text: note || '(note)', size:9, color, textColor:'#212529', width:1, dash:'solid', fill:'yellow'}); }
+      else if(st==='Highlight' || st==='Underline' || st==='StrikeOut' || st==='Squiggly'){
+        const q = nums(get(d,'QuadPoints')); if(!q || q.length < 8) return null; const out = [];
+        for(let k=0;k+7<q.length;k+=8){ const P = [V(q[k],q[k+1]),V(q[k+2],q[k+3]),V(q[k+4],q[k+5]),V(q[k+6],q[k+7])], xs = P.map(p=>p[0]), ys = P.map(p=>p[1]);
+          const bx = {x:Math.min(...xs), y:Math.min(...ys), w:Math.max(...xs)-Math.min(...xs), h:Math.max(...ys)-Math.min(...ys)};
+          if(st==='Highlight') out.push(Object.assign({}, base, {type:'rect', x:bx.x, y:bx.y, w:bx.w, h:bx.h, fill:'tint', dash:'none', note}));
+          else { const yy = st==='StrikeOut' ? bx.y+bx.h/2 : bx.y+bx.h-0.5; out.push(Object.assign({}, base, {type:'line', x1:bx.x, y1:yy, x2:bx.x+bx.w, y2:yy, width:1, dash:'solid', note})); } }
+        return {multi:out, layer};
+      }
+      return a ? {a, layer} : null;
+    }
+  });
+  const flat = []; items.forEach(it => { if(it.multi) it.multi.forEach(a => flat.push({a, layer:it.layer, page:it.page})); else flat.push(it); });
+  return {items:flat, skipped, bytes: changed ? await pdf.save() : null};
 }
 
 /* Låst billedkopi: hver side renderes til et billede og lægges i en ny PDF */
@@ -395,6 +545,6 @@ async function rasterizePdf(pdfjsLib, PDFLib, bytes, o){
   return out.save();
 }
 
-return {areaNet, volumeM3, angleGeom, fmtNum, cloudPoly, polyLen, polyArea, fmtArea, stampBox, markerOps, rasterizePdf, dimLabels, setMeasure, fmtLen, prims, primsToSvg, textBox, bbox, buildPdf, PT_MM, FILLS, rectOps, circleOps, opsToD};
+return {readAnnots, areaNet, volumeM3, angleGeom, fmtNum, cloudPoly, polyLen, polyArea, fmtArea, stampBox, markerOps, rasterizePdf, dimLabels, setMeasure, fmtLen, prims, primsToSvg, textBox, bbox, buildPdf, PT_MM, FILLS, rectOps, circleOps, opsToD};
 })();
 if(typeof module !== 'undefined') module.exports = BladrCore;

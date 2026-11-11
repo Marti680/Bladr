@@ -21,8 +21,8 @@ const kids=[
   new Paragraph({heading:HeadingLevel.HEADING_1,children:[new TextRun({text:'1. Funktioner i Bladr i dag',font:FONT})]}),
 ];
 for(const [h,items] of D.funktioner){kids.push(new Paragraph({heading:HeadingLevel.HEADING_2,children:[new TextRun({text:h,font:FONT})]}));items.forEach(t=>kids.push(bullet(t)))}
-kids.push(new Paragraph({heading:HeadingLevel.HEADING_1,children:[new TextRun({text:'2. Planlagt (besluttet '+D.opdateret+')',font:FONT})]}));
-kids.push(table(['Funktion','Hvad det går ud på'],D.planlagt,[2600,7038]));
+kids.push(new Paragraph({heading:HeadingLevel.HEADING_1,children:[new TextRun({text:'2. Planlagt',font:FONT})]}));
+if(D.planlagt.length)kids.push(table(['Funktion','Hvad det går ud på'],D.planlagt,[2600,7038]));else kids.push(P('Intet planlagt lige nu. Alt, du har besluttet, er bygget og står under funktioner.'));
 kids.push(new Paragraph({heading:HeadingLevel.HEADING_1,children:[new TextRun({text:'3. Venteliste',font:FONT})]}));
 kids.push(P('Idéer, du har overvejet eller sat på pause. Status viser, hvor de står.'));
 kids.push(table(['Idé','Hvad det går ud på','Foreslået','Status'],D.venteliste,[2050,4500,1188,1900]));

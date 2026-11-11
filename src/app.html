@@ -273,6 +273,9 @@ table.calc td:first-child{min-width:90px}
 table.calc .num{height:26px;width:62px;padding:0 5px;font-size:12px}
 table.calc .ct{width:44px}
 .calctotal{font-weight:600;font-size:13px;padding:6px 2px 0}
+.annbar{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:min(560px,calc(100% - 32px));z-index:6;background:var(--panel);border:1px solid var(--accent);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.14);padding:10px 12px;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;font-size:13px}
+.annbar #annMsg{flex:1 1 240px;min-width:0}
+.annbtns{display:flex;gap:6px;margin-left:auto}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:9px 14px;border-radius:8px;font-size:13px;z-index:60;max-width:calc(100% - 32px)}
 
 @media (max-width:1700px){ .ib .lbl{display:none} }
@@ -495,7 +498,8 @@ table.calc .ct{width:44px}
     <div class="pane" id="paneFind" hidden><div class="status" id="findStatus">Skriv i søgefeltet for at søge.</div><div class="results" id="results"></div></div>
   </aside>
 
-  <main class="main" id="main"><div class="viewer" id="viewer" tabindex="-1"></div></main>
+  <main class="main" id="main"><div class="viewer" id="viewer" tabindex="-1"></div>
+    <div class="annbar" id="annBar" hidden role="status"><span id="annMsg"></span><span class="annbtns"><button type="button" class="ghost" id="annNo">Ikke nu</button><button type="button" class="primary" id="annGo">Gør redigerbare</button></span></div></main>
 </div>
 
 <div class="modal" id="pwBox" hidden>
@@ -537,6 +541,7 @@ table.calc .ct{width:44px}
     <h2>Eksportér med markeringer</h2>
     <fieldset><legend>Format</legend>
       <label class="opt"><input type="radio" name="expMode" value="ocg" checked><span>Samlet PDF med lag<small>Lagene kan slås til og fra i Adobe, Bluebeam og lignende.</small></span></label>
+      <label class="opt"><input type="radio" name="expMode" value="annot"><span>PDF med redigerbare kommentarer<small>Markeringerne bliver til kommentarer, som andre kan flytte og rette i Bluebeam, Adobe og lignende. Lagene følger med.</small></span></label>
       <label class="opt"><input type="radio" name="expMode" value="flat"><span>Samlet PDF, fladt<small>Markeringer og eventuelle formularfelter låses fast på siderne. Teksten kan stadig søges i.</small></span></label>
       <label class="opt"><input type="radio" name="expMode" value="img"><span>Låst billedkopi<small>Hver side gemmes som et billede. Sværest at ændre, men teksten kan ikke søges i, og filen bliver større.</small></span></label>
       <label class="opt"><input type="radio" name="expMode" value="sep"><span>Én PDF pr. lag<small>Hver fil indeholder dokumentet med ét lag, fladt og med låste formularfelter.</small></span></label>
@@ -754,6 +759,7 @@ async function openBuffer(buf,name,key,seed){
   requestAnimationFrame(()=>goTo(savedPage>1&&savedPage<=doc.numPages?savedPage:1,false));
   renderFiles();
   if(query)runSearch();
+  checkComments(my);
 }
 
 function askPassword(cb,wrong){
@@ -1935,7 +1941,7 @@ $('lExport').onclick=()=>{
   quantities().forEach(r=>{const c=S.calc[r.key]||{},has=c.f!=null&&c.f!=='';q.push([r.label,+r.qty.toFixed(r.unit==='stk'?0:3),r.unit,has?c.f:'',has?+(r.qty*c.f).toFixed(2):'',c.t||''])});
   const sheets=[['Markeringer',m,[5,6,14,14,40,12,30,17,14]],['Optælling',o,[28,8,8]],['Mængder',q,[34,12,12,12,14,8]]];
   if(extractGrid&&extractGrid.length)sheets.push(['Udtræk',extractGrid.map(r=>r.map(c=>{const v=pureNum(c);return v!=null?v:c}))]);
-  saveFile(docName.replace(/\.pdf$/i,'')+' - markeringsliste.xlsx',xlsxBlob(sheets),'Markeringslisten er gemt som Excel');
+  saveDownload(docName.replace(/\.pdf$/i,'')+' - markeringsliste.xlsx',xlsxBlob(sheets),'Markeringslisten er gemt som Excel');
 };
 
 /* ---------- tekst fra PDF'en (bruges af udtræk og tæl tekst) ---------- */
@@ -2016,14 +2022,14 @@ function xlsxBlob(sheets){
   return new Blob([XLSX.write(wb,{type:'array',bookType:'xlsx'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
 }
 const safeName=s=>s.replace(/[\\/:*?"<>|]/g,'-');
-async function saveFile(filename,blob,okMsg){
+async function saveDownload(filename,blob,okMsg){
   if(!downloads){toast('Gem af filer er ikke tilgængeligt i denne visning.');return}
   try{await downloads.save({filename:safeName(filename),data:blob});toast(okMsg)}catch(err){if(!err||err.code!=='declined')toast('Filen kunne ikke gemmes.')}
 }
 $('xSave').onclick=()=>{
   if(!extractGrid||typeof XLSX==='undefined')return;
   const aoa=extractGrid.map(r=>r.map(c=>{const v=pureNum(c);return v!=null?v:c}));
-  saveFile(docName.replace(/\.pdf$/i,'')+' - udtræk side '+(extractSel.p.n)+'.xlsx',xlsxBlob([['Udtræk',aoa]]),'Excel-filen er gemt');
+  saveDownload(docName.replace(/\.pdf$/i,'')+' - udtræk side '+(extractSel.p.n)+'.xlsx',xlsxBlob([['Udtræk',aoa]]),'Excel-filen er gemt');
 };
 function extractOverlay(p){
   if(!extractSel||extractSel.p!==p)return ''; const r=extractSel.r, s=scale;
@@ -2170,17 +2176,17 @@ $('expForm').onsubmit=async e=>{
   const mode=document.querySelector('input[name="expMode"]:checked').value;
   const ids=[...$('expLayers').querySelectorAll('input:checked')].map(i=>i.value);
   const layers=S.layers.filter(l=>ids.includes(l.id));
-  if(!layers.length&&(mode==='ocg'||mode==='sep')){$('expMsg').textContent='Vælg mindst ét lag med markeringer.';return}
+  if(!layers.length&&(mode==='ocg'||mode==='sep'||mode==='annot')){$('expMsg').textContent='Vælg mindst ét lag med markeringer.';return}
   $('expGo').disabled=true;$('expMsg').textContent='Bygger PDF …';
   const stem=docName.replace(/\.pdf$/i,'');
   let info={};
-  const build=(ls,m)=>C.buildPdf(PDFLib,origBytes.slice(0),{mode:m,layers:ls,info,flattenForm:m!=='ocg',
+  const build=(ls,m)=>C.buildPdf(PDFLib,origBytes.slice(0),{mode:m,layers:ls,info,flattenForm:m==='flat',contentsOf:a=>a.type==='text'?a.text:(a.note||describe(a)[1]||''),subjOf:a=>describe(a)[0],
     annotsFor:(i,lid)=>S.annots.filter(a=>a.page===i&&a.layer===lid&&!(a.type==='text'&&!a.text.trim())),
     pageInfo:i=>({transform:sizes[i].t,scale:pageScale(i),unit:S.unit,paperUnit:S.paperUnit,dec:S.dec,groups:S.countGroups})});
   try{
     const jobs = mode==='sep' ? layers.map(l=>({ls:[l],name:stem+' - '+l.name+'.pdf',m:'flat'}))
       : mode==='img' ? [{ls:layers,name:stem+' - låst.pdf',m:'flat',img:true}]
-      : [{ls:layers,name:stem+(S.annots.some(a=>a.type==='sign')?' - underskrevet.pdf':' - markeret.pdf'),m:mode}];
+      : [{ls:layers,name:stem+(S.annots.some(a=>a.type==='sign')?' - underskrevet.pdf':mode==='annot'?' - kommentarer.pdf':' - markeret.pdf'),m:mode}];
     for(let j=0;j<jobs.length;j++){
       const job=jobs[j]; if(jobs.length>1)$('expMsg').textContent=`Fil ${j+1} af ${jobs.length}: ${job.name}`;
       let bytes=await build(job.ls,job.m);
@@ -2194,6 +2200,43 @@ $('expForm').onsubmit=async e=>{
     $('expBox').hidden=true; toast((jobs.length>1?jobs.length+' filer gemt':'PDF gemt')+(info.fields?` · ${info.fields} formularfelt${info.fields===1?'':'er'} låst`:''),4000);
   }catch(err){ $('expMsg').textContent='Eksporten fejlede: '+(err&&err.message?err.message:err); }
   $('expGo').disabled=false;
+};
+
+/* ---------- PDF-kommentarer fra andre programmer ---------- */
+const CMT_TYPES=['Square','Circle','Line','Polygon','PolyLine','FreeText','Ink','Text','Highlight','Underline','StrikeOut','Squiggly','Stamp'];
+let cmtImport=null;
+async function checkComments(my){
+  $('annBar').hidden=true; cmtImport=null; if(encrypted||!doc)return;
+  let n=0;
+  try{for(let i=1;i<=doc.numPages;i++){const an=await (await doc.getPage(i)).getAnnotations({intent:'display'});if(my!==gen)return;n+=an.filter(a=>CMT_TYPES.includes(a.subtype)).length}}catch{return}
+  if(!n)return;
+  let r; try{r=await C.readAnnots(PDFLib,origBytes.slice(0),sizes.map(s=>s.t))}catch{return}
+  if(my!==gen||!r.items.length)return;
+  cmtImport=r; const own=r.items.filter(i=>i.own).length, k=r.items.length;
+  $('annMsg').textContent=(own===k?`Filen har ${k} markering${k===1?'':'er'} fra Bladr som PDF-kommentarer.`:`Filen har ${k} kommentar${k===1?'':'er'} fra et andet program, fx Bluebeam eller Adobe.`)+' Gør dem til markeringer, du kan rette i Bladr?'+(r.skipped?` (${r.skipped} kan ikke overtages og bliver liggende.)`:'');
+  $('annBar').hidden=false;
+}
+$('annNo').onclick=()=>{$('annBar').hidden=true};
+$('annGo').onclick=async()=>{
+  const r=cmtImport; if(!r||!r.bytes)return; $('annGo').disabled=true;
+  try{
+    clearTimeout(saveT); finishEdit();
+    const N=JSON.parse(JSON.stringify(S)), key=docKey, name=docName;
+    const layerFor=nm=>{nm=nm||'Kommentarer';let l=N.layers.find(x=>x.name===nm);if(!l){l={id:uid(),name:nm,visible:true};N.layers.push(l)}return l.id};
+    r.items.forEach(it=>{
+      const a=Object.assign({},it.a); a.id=uid(); a.page=it.page; a.layer=layerFor(it.layer);
+      if(!a.created)a.created=Date.now();
+      if(a.type==='count'){const g=it.group;if(g&&!N.countGroups.some(x=>x.id===g.id))N.countGroups.push(Object.assign({},g));if(!a.group||!N.countGroups.some(x=>x.id===a.group)){let d=N.countGroups.find(x=>x.name==='Importeret');if(!d){d={id:uid(),name:'Importeret',color:'#e03131',shape:'circle'};N.countGroups.push(d)}a.group=d.id}}
+      N.annots.push(a);
+    });
+    await tx('annots','readwrite',s=>s.put({key,data:N}));
+    const rec=await tx('files','readonly',s=>s.get(key)), blob=new Blob([r.bytes],{type:'application/pdf'});
+    if(rec){rec.blob=blob;rec.size=blob.size;await tx('files','readwrite',s=>s.put(rec))}
+    $('annBar').hidden=true;
+    await openBuffer(r.bytes.buffer.slice(r.bytes.byteOffset,r.bytes.byteOffset+r.bytes.byteLength),name,key);
+    toast(r.items.length+' kommentar'+(r.items.length===1?'':'er')+' er nu markeringer i Bladr. Filen på din computer er ikke ændret.',5000);
+  }catch(err){toast('Kommentarerne kunne ikke overtages: '+(err&&err.message||err),5000)}
+  $('annGo').disabled=false;
 };
 
 /* ---------- miniaturer ---------- */
