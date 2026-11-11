@@ -201,6 +201,12 @@ kbd{font:11px var(--mono);border:1px solid var(--line);border-bottom-width:2px;b
 .sigcol{width:26px;height:26px;border-radius:50%;border:2px solid var(--panel);box-shadow:0 0 0 1px var(--line);padding:0}
 .sigcol[aria-pressed="true"]{box-shadow:0 0 0 2px var(--fg)}
 .cgroups{display:flex;flex-direction:column;gap:2px}
+.csess{border:1px solid var(--accent);border-radius:8px;padding:9px;display:flex;flex-direction:column;gap:7px;background:var(--accent-soft)}
+.csess-h{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.csess-h b{font-family:var(--mono);font-size:14px;letter-spacing:0;text-transform:none;color:var(--fg)}
+.cauto{display:flex;flex-direction:column;gap:7px}
+.cauto button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent)}
+.cok{color:#2b8a3e;font-weight:700;margin-right:2px}
 .cgroup{display:flex;align-items:center;border-radius:6px}
 .cgroup.act{background:var(--accent-soft)}
 .cpick{flex:1;min-width:0;border:0;background:none;display:flex;align-items:center;gap:8px;padding:6px 6px;text-align:left;border-radius:6px}
@@ -375,13 +381,29 @@ table.calc .ct{width:44px}
       </div>
     </section>
     <section class="psec" id="secCount" hidden>
+      <div class="csess" id="cSession" hidden>
+        <div class="csess-h"><span>Optælling i gang</span><b id="cSessNum">0 stk.</b></div>
+        <input class="num" id="cSessName" style="font-family:var(--sans);width:100%" aria-label="Navn på optællingen">
+        <p class="pnote" id="cSessInfo"></p>
+        <p class="pnote">Klik på en forkert markering for at fjerne den. Klik et tomt sted for at tilføje en, der mangler.</p>
+        <div style="display:flex;gap:6px"><button type="button" class="ghost" id="cDiscard" style="flex:1">Kassér</button><button type="button" class="primary" id="cApprove" style="flex:1;justify-content:center">Godkend</button></div>
+      </div>
+      <div class="cauto" id="cAuto">
+        <div style="display:flex;gap:6px"><button type="button" class="ghost" id="cSimilar" style="flex:1">Find lignende</button><button type="button" class="ghost" id="cText" style="flex:1">Tæl tekst</button></div>
+        <div id="cTextRow" hidden style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;gap:6px"><input class="num" id="cQuery" placeholder="Tekst, fx S1 eller WC" style="font-family:var(--sans);flex:1;min-width:0" aria-label="Tekst der skal tælles"><button type="button" class="primary" id="cTextGo">Tæl</button></div>
+          <label class="check"><input type="checkbox" id="cWord" checked> Kun hele ord</label>
+        </div>
+        <label class="check"><input type="checkbox" id="cAll"> Søg på alle sider</label>
+        <p class="pnote" id="cAutoNote">Bladr kan finde symboler eller tekst for dig. Du retter fejl og mangler bagefter og trykker Godkend.</p>
+      </div>
       <h3 id="cHead">Grupper</h3>
       <div class="cgroups" id="cGroups"></div>
       <div style="display:flex;gap:6px"><input class="num" id="cNew" placeholder="Ny gruppe, fx Stikkontakt" style="font-family:var(--sans);flex:1" aria-label="Ny gruppe"><button type="button" class="ghost" id="cAdd">Tilføj</button></div>
       <div class="prow" id="rCShape"><label class="plabel" for="cShape">Symbol</label><select class="sel" id="cShape"><option value="circle">Cirkel</option><option value="square">Firkant</option><option value="triangle">Trekant</option><option value="diamond">Rombe</option></select></div>
       <div class="prow" id="rCColor"><span class="plabel">Farve</span><div class="swatches" id="cColor"></div></div>
       <button type="button" class="ghost" id="cInsert">Indsæt optælling som tabel på siden</button>
-      <p class="pnote">Klik på tegningen for at tælle i den aktive gruppe. Backspace fjerner den seneste. Dobbeltklik på en gruppe for at omdøbe den.</p>
+      <p class="pnote">Klik på tegningen for at tælle i den aktive gruppe. Backspace fjerner den seneste. Klik på en godkendt gruppe for at rette i den. Dobbeltklik for at omdøbe.</p>
     </section>
     <section class="psec" id="secStamp" hidden>
       <h3>Stempel</h3>
@@ -636,7 +658,7 @@ const mctx = document.createElement('canvas').getContext('2d');
 C.setMeasure((s, size) => { mctx.font = size + 'px Helvetica, Arial, sans-serif'; return mctx.measureText(s).width; });
 
 let doc=null, docKey='', docName='', origBytes=null, encrypted=false, pages=[], sizes=[], base=null, scale=1, fit='width', rot=0, cur=1;
-let pageTexts=null, query='', loadingTask=null, gen=0, textCache={}, extractSel=null, extractGrid=null;
+let pageTexts=null, query='', loadingTask=null, gen=0, textCache={}, extractSel=null, extractGrid=null, countPick=false, vecCache={};
 let S = freshState();            // markeringer for det åbne dokument
 let tool='select', selId=null, editingId=null, drag=null, undoStack=[], redoStack=[];
 const COLORS = ['#e03131','#1c7ed6','#2f9e44','#f08c00','#c2255c','#212529'];
@@ -707,7 +729,7 @@ async function openBuffer(buf,name,key,seed){
   finishEdit();
   if(loadingTask){try{loadingTask.destroy()}catch{}}
   if(doc){try{doc.destroy()}catch{}}
-  doc=null;pages=[];sizes=[];pageTexts=null;textCache={};extractSel=null;extractGrid=null;viewer.innerHTML='';$('thumbs').innerHTML='';encrypted=false;selId=null;
+  doc=null;pages=[];sizes=[];pageTexts=null;textCache={};vecCache={};countPick=false;extractSel=null;extractGrid=null;viewer.innerHTML='';$('thumbs').innerHTML='';encrypted=false;selId=null;
   origBytes=buf.slice(0);
   loadingTask=pdfjsLib.getDocument({data:new Uint8Array(buf)});
   loadingTask.onPassword=(cb,reason)=>{encrypted=true;askPassword(cb,reason===2)};
@@ -863,11 +885,12 @@ function updUndo(){$('btnUndo').disabled=!undoStack.length;$('btnRedo').disabled
 function commit(){persist();renderAllAnn();renderLayers();updProps();updScaleBtn();renderList()}
 
 /* ---------- værktøjer ---------- */
-const HINTS={extract:'Træk en ramme om tal eller en tabel. Du får sum, gennemsnit og antal og kan gemme tabellen som Excel.',angle:'Klik på det første ben, derefter i vinkelspidsen og til sidst på det andet ben.',hole:'Klik rundt om hullet. Klik på startpunktet, dobbeltklik eller Enter for at lukke det. Esc fortryder.',symbol:'Klik på tegningen for at sætte symbolet ind. Bliv ved med at klikke for flere. Esc afslutter.',poly:'Klik for hvert knæk. Dobbeltklik eller Enter afslutter, Backspace fjerner sidste punkt. Shift låser til 45°.',area:'Klik rundt om fladen. Klik på startpunktet, dobbeltklik eller Enter lukker den. Backspace fjerner sidste punkt.',count:'Klik på hvert element, der skal tælles. Vælg eller opret gruppen herunder.',stamp:'Vælg stempel herunder, og klik på siden, hvor det skal stå.',sign:'Klik på siden, hvor underskriften skal stå. Esc annullerer.',select:'Klik på en markering for at vælge den. Dobbeltklik for at redigere tekst og mål. Klik på papiret eller tryk Esc for at afslutte.',line:'Træk for at tegne. Shift låser til 45°.',arrow:'Træk fra start til spids. Shift låser til 45°.',rect:'Træk en ramme op.',circle:'Træk fra centrum og ud. Afstanden er radius.',text:'Klik hvor teksten skal stå. Klik på et eksisterende tekstfelt for at redigere det.',callout:'Træk fra punktet pilen skal pege på, hen til hvor teksten skal stå.',measure:'Træk mellem to punkter. Shift låser til 45°.',calibrate:'Træk mellem to punkter med kendt afstand.'};
+const HINTS={extract:'Træk en ramme om tal eller en tabel. Du får sum, gennemsnit og antal og kan gemme tabellen som Excel.',angle:'Klik på det første ben, derefter i vinkelspidsen og til sidst på det andet ben.',hole:'Klik rundt om hullet. Klik på startpunktet, dobbeltklik eller Enter for at lukke det. Esc fortryder.',symbol:'Klik på tegningen for at sætte symbolet ind. Bliv ved med at klikke for flere. Esc afslutter.',poly:'Klik for hvert knæk. Dobbeltklik eller Enter afslutter, Backspace fjerner sidste punkt. Shift låser til 45°.',area:'Klik rundt om fladen. Klik på startpunktet, dobbeltklik eller Enter lukker den. Backspace fjerner sidste punkt.',count:'Klik på hvert element, der skal tælles. Klik på en markering igen for at fjerne den. Eller lad Bladr finde dem med Find lignende eller Tæl tekst.',stamp:'Vælg stempel herunder, og klik på siden, hvor det skal stå.',sign:'Klik på siden, hvor underskriften skal stå. Esc annullerer.',select:'Klik på en markering for at vælge den. Dobbeltklik for at redigere tekst og mål. Klik på papiret eller tryk Esc for at afslutte.',line:'Træk for at tegne. Shift låser til 45°.',arrow:'Træk fra start til spids. Shift låser til 45°.',rect:'Træk en ramme op.',circle:'Træk fra centrum og ud. Afstanden er radius.',text:'Klik hvor teksten skal stå. Klik på et eksisterende tekstfelt for at redigere det.',callout:'Træk fra punktet pilen skal pege på, hen til hvor teksten skal stå.',measure:'Træk mellem to punkter. Shift låser til 45°.',calibrate:'Træk mellem to punkter med kendt afstand.'};
 const SELHINT={angle:'Træk i punkterne for at justere vinklen. Vinklen kan trækkes til en anden plads.',symbol:'Træk for at flytte, og træk i hjørnet for at ændre størrelsen. Den nye størrelse huskes til næste gang.',poly:'Træk i punkterne for at justere. Slå delmål til under Udseende. Længden kan trækkes til en anden plads.',area:'Træk i punkterne for at justere. Areal og omkreds står i midten og kan trækkes.',count:'Tællepunkt. Delete fjerner det.',stamp:'Træk for at flytte, og træk i hjørnet for at ændre størrelsen. Vælg et andet stempel herunder for at skifte tekst.',sign:'Træk for at flytte. Træk i hjørnet nederst til højre for at ændre størrelsen.',text:'Dobbeltklik for at redigere teksten. Træk for at flytte.',callout:'Dobbeltklik for at redigere teksten. Træk i pilespidsen for at flytte den.',measure:'Træk i måltallet for at flytte det. Dobbeltklik for at skrive din egen tekst. Træk i endepunkterne for at justere.',line:'Træk i endepunkterne, eller skriv længde og vinkel under Mål. Måltallet kan trækkes til en anden plads.',arrow:'Træk i endepunkterne, eller skriv længde og vinkel under Mål. Måltallet kan trækkes til en anden plads.',rect:'Træk i hjørnerne, eller skriv bredde og højde under Mål. Måltallet kan trækkes til en anden plads.',circle:'Træk i håndtaget for at ændre størrelsen, eller skriv målet under Mål. Måltallet kan trækkes til en anden plads.'};
 function setTool(t){
   if(polyDraw&&t!==tool)cancelPoly();
   if(t!=='symbol')pendingSym=null;
+  if(t!=='count')countPick=false;
   if(!kitApplying)activeKit=null;
   if(t!=='sign'){pendingSig=null;if(ghost){const gp=ghost.p;ghost=null;renderAnn(gp)}}
   finishEdit(); tool=t; if(t!=='select'){selId=null;renderAllAnn()}
@@ -904,7 +927,7 @@ function onDown(p,e){
   e.preventDefault(); p.svg.setPointerCapture(e.pointerId);
   if(tool==='sign'){if(pendingSig){placeSig(p,pt);drag={mode:'noop',p}}return}
   if(tool==='poly'||tool==='area'||tool==='angle'||tool==='hole'){polyClick(p,pt,e);drag={mode:'noop',p};return}
-  if(tool==='count'){placeCount(p,pt);drag={mode:'noop',p};return}
+  if(tool==='count'){if(countPick){drag={mode:'draw',p,start:pt,cur:pt,hadSel:false};return}placeCount(p,pt);drag={mode:'noop',p};return}
   if(tool==='symbol'){if(pendingSym)placeSymbol(p,pt);drag={mode:'noop',p};return}
   if(tool==='stamp'){if(selId){goHome();return}ensureActiveVisible();addAnnot(makeStamp(pt.x,pt.y),p.n-1,true);ghost=null;drag={mode:'noop',p};return}
   if(tool==='text'){
@@ -926,7 +949,7 @@ addEventListener('pointermove',e=>{
   }
   if(drag.mode==='noop')return;
   const p=drag.p, pt=evtPt(p,e);
-  if(drag.mode==='draw'){drag.cur=(tool==='rect'||tool==='callout'||tool==='circle'||tool==='extract')?pt:snap45(drag.start,pt,e);drag.preview=previewSvg();renderAnn(p);return}
+  if(drag.mode==='draw'){drag.cur=(tool==='rect'||tool==='callout'||tool==='circle'||tool==='extract'||tool==='count')?pt:snap45(drag.start,pt,e);drag.preview=previewSvg();renderAnn(p);return}
   const dx=pt.x-drag.start.x, dy=pt.y-drag.start.y;
   if(!drag.moved&&Math.hypot(dx,dy)*scale<2)return;
   if(!drag.moved){pushHist();drag.moved=true}
@@ -959,6 +982,7 @@ addEventListener('pointerup',e=>{
   const a0=d.start,a1=d.cur,len=Math.hypot(a1.x-a0.x,a1.y-a0.y), pi=d.p.n-1;
   renderAnn(d.p);
   if(d.hadSel&&tool!=='calibrate'&&len*scale<4){goHome();return}
+  if(tool==='count'&&countPick){const r={x:Math.min(a0.x,a1.x),y:Math.min(a0.y,a1.y),w:Math.abs(a1.x-a0.x),h:Math.abs(a1.y-a0.y)};if(r.w*scale>4&&r.h*scale>4)findSimilar(d.p,r);else toast('Træk en ramme om ét symbol.');return}
   if(tool==='extract'){const r={x:Math.min(a0.x,a1.x),y:Math.min(a0.y,a1.y),w:Math.abs(a1.x-a0.x),h:Math.abs(a1.y-a0.y)};if(r.w*scale>6&&r.h*scale>6)runExtract(d.p,r);return}
   if(tool==='calibrate'){
     if(len*scale<6){toast('Træk mellem to punkter.');return}
@@ -994,7 +1018,7 @@ function addAnnot(a,pi,select){
 function previewSvg(){
   const {start:a0,cur:a1}=drag, pi=drag.p.n-1;
   let a;
-  if(tool==='extract')return `<rect x="${Math.min(a0.x,a1.x)}" y="${Math.min(a0.y,a1.y)}" width="${Math.abs(a1.x-a0.x)}" height="${Math.abs(a1.y-a0.y)}" fill="rgba(31,95,139,.08)" stroke="#1f5f8b" stroke-width="${1.2/scale}" stroke-dasharray="${5/scale} ${3/scale}"/>`;
+  if(tool==='extract'||tool==='count')return `<rect x="${Math.min(a0.x,a1.x)}" y="${Math.min(a0.y,a1.y)}" width="${Math.abs(a1.x-a0.x)}" height="${Math.abs(a1.y-a0.y)}" fill="rgba(31,95,139,.08)" stroke="#1f5f8b" stroke-width="${1.2/scale}" stroke-dasharray="${5/scale} ${3/scale}"/>`;
   if(tool==='rect'){const df=defaults.rect;a=Object.assign({},df,{type:'rect',x:Math.min(a0.x,a1.x),y:Math.min(a0.y,a1.y),w:Math.max(1,Math.abs(a1.x-a0.x)),h:Math.max(1,Math.abs(a1.y-a0.y))})}
   else if(tool==='circle')a=Object.assign({},defaults.circle,{type:'circle',cx:a0.x,cy:a0.y,r:Math.max(1,Math.hypot(a1.x-a0.x,a1.y-a0.y))});
   else if(tool==='measure')a=Object.assign({type:'measure',x1:a0.x,y1:a0.y,x2:a1.x,y2:a1.y},defaults.measure);
@@ -1472,12 +1496,18 @@ function polyPreview(p){
 let countStack=[];
 const SHAPES={circle:'Cirkel',square:'Firkant',triangle:'Trekant',diamond:'Rombe'};
 function activeGroup(){return S.countGroups.find(g=>g.id===S.activeCount)}
+function newGroup(name){
+  const used=S.countGroups.map(g=>g.color), g={id:uid(),name,color:COLORS.find(c=>!used.includes(c))||COLORS[S.countGroups.length%COLORS.length],shape:'circle'};
+  S.countGroups.push(g); S.activeCount=g.id; return g;
+}
 function ensureGroup(){
-  let g=activeGroup(); if(g)return g;
-  g=S.countGroups[0]; if(!g){g={id:uid(),name:'Punkt',color:COLORS[S.countGroups.length%COLORS.length],shape:'circle'};S.countGroups.push(g)}
-  S.activeCount=g.id; return g;
+  const g=activeGroup(); if(g&&!g.approved)return g;
+  return newGroup('Optælling '+(S.countGroups.length+1));
 }
 function placeCount(p,pt){
+  const ag=activeGroup();
+  if(ag&&!ag.approved){const r=Math.max(defaults.count.size*0.75,6/scale), hit=S.annots.find(a=>a.type==='count'&&a.group===ag.id&&a.page===p.n-1&&Math.hypot(a.x-pt.x,a.y-pt.y)<Math.max(r,(a.size||9)*0.75));
+    if(hit){pushHist();S.annots=S.annots.filter(a=>a!==hit);countStack=countStack.filter(id=>id!==hit.id);commit();return}}
   const g=ensureGroup();
   const a=addAnnot({type:'count',x:pt.x,y:pt.y,group:g.id,size:defaults.count.size},p.n-1,false);
   countStack.push(a.id);
@@ -1490,9 +1520,9 @@ function renderCount(){
   S.countGroups.forEach(g=>{
     const c=groupCounts(g.id), row=document.createElement('div'); row.className='cgroup'+(g.id===S.activeCount?' act':'');
     const sym=`<svg viewBox="-6 -6 12 12" width="14" height="14" aria-hidden="true"><path d="${C.opsToD(C.markerOps(g.shape,0,0,4.2))}" fill="${g.color}"/></svg>`;
-    row.innerHTML=`<button type="button" class="cpick">${sym}<span class="cname">${esc(g.name)}</span><span class="cnum">${c.page} / ${c.total}</span></button>`+
+    row.innerHTML=`<button type="button" class="cpick">${sym}<span class="cname">${g.approved?'<span class="cok" title="Godkendt">✓</span>':''}${esc(g.name)}</span><span class="cnum">${c.page} / ${c.total}</span></button>`+
       (cDelConfirm===g.id?'<button type="button" class="x confirm">Slet?</button>':'<button type="button" class="x" aria-label="Slet gruppe">✕</button>');
-    row.querySelector('.cpick').onclick=()=>{S.activeCount=g.id;persist();if(tool!=='count')setTool('count');renderCount()};
+    row.querySelector('.cpick').onclick=()=>{if(g.approved&&S.activeCount!==g.id){g.approved=false;toast(g.name+' er åbnet igen. Ret og tryk Godkend.')}S.activeCount=g.id;persist();if(tool!=='count')setTool('count');renderCount();renderAllAnn()};
     row.querySelector('.cpick').ondblclick=()=>{const nm=$('cNew');nm.value=g.name;nm.dataset.rename=g.id;$('cAdd').textContent='Omdøb';nm.focus()};
     row.querySelector('.x').onclick=()=>{
       if(c.total&&cDelConfirm!==g.id){cDelConfirm=g.id;renderCount();setTimeout(()=>{if(cDelConfirm===g.id){cDelConfirm=null;renderCount()}},3500);return}
@@ -1504,6 +1534,126 @@ function renderCount(){
   $('rCShape').hidden=$('rCColor').hidden=!g;
   if(g){setVal('cShape',g.shape);document.querySelectorAll('#cColor .sw').forEach(b=>b.setAttribute('aria-pressed',b.dataset.c===g.color))}
   $('cHead').textContent='Grupper · side '+cur+' / i alt';
+  const open=g&&!g.approved; $('cSession').hidden=!open;
+  if(open){const c=groupCounts(g.id), pg=new Set(S.annots.filter(a=>a.type==='count'&&a.group===g.id).map(a=>a.page)).size;
+    $('cSessNum').textContent=c.total+' stk.'; if(document.activeElement!==$('cSessName'))$('cSessName').value=g.name;
+    $('cSessInfo').textContent=c.total?('Side '+cur+': '+c.page+' stk.'+(pg>1?' · på '+pg+' sider':'')):'Klik på tegningen, eller brug Find lignende / Tæl tekst herunder.'}
+  $('cSimilar').setAttribute('aria-pressed',countPick); $('cText').setAttribute('aria-pressed',!$('cTextRow').hidden);
+  $('cAutoNote').textContent=countPick?'Træk en ramme om ét eksempel på symbolet. Esc fortryder.':(open&&groupCounts(g.id).total?'Find lignende og Tæl tekst starter en ny optælling, når du har godkendt denne.':'Bladr kan finde symboler eller tekst for dig. Du retter fejl og mangler bagefter og trykker Godkend.');
+}
+$('cSessName').addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();e.target.blur()}});
+$('cSessName').addEventListener('change',e=>{const g=activeGroup(),v=e.target.value.trim();if(!g||!v||v===g.name)return;pushHist();g.name=v;commit()});
+$('cApprove').onclick=()=>{
+  const g=activeGroup(); if(!g)return; const n=groupCounts(g.id).total;
+  if(!n){toast('Der er ikke talt noget endnu.');return}
+  const v=$('cSessName').value.trim(); pushHist(); if(v)g.name=v; g.approved=true; S.activeCount=null; countStack=[]; commit();
+  toast(g.name+': '+n+' stk. godkendt og lagt på listen.');
+};
+$('cDiscard').onclick=()=>{
+  const g=activeGroup(); if(!g)return; pushHist();
+  S.annots=S.annots.filter(a=>!(a.type==='count'&&a.group===g.id)); S.countGroups=S.countGroups.filter(x=>x!==g); S.activeCount=null; countStack=[]; commit();
+  toast('Optællingen er kasseret. Ctrl+Z fortryder.');
+};
+
+/* ---------- find lignende og tæl tekst ---------- */
+function autoGroup(name){
+  const g=activeGroup();
+  if(g&&!g.approved&&!groupCounts(g.id).total){g.name=name;return g}
+  return newGroup(name);
+}
+function autoPages(){return $('cAll').checked?[...Array(doc.numPages).keys()]:[cur-1]}
+function addHits(g,hits){
+  ensureActiveVisible(); pushHist(); let n=0;
+  hits.forEach(h=>{
+    if(S.annots.some(a=>a.type==='count'&&a.group===g.id&&a.page===h.pi&&Math.hypot(a.x-h.x,a.y-h.y)<(a.size||9)*0.6))return;
+    S.annots.push(meta({id:uid(),layer:S.active,page:h.pi,type:'count',x:h.x,y:h.y,group:g.id,size:defaults.count.size})); n++;
+  });
+  if(tool!=='count')setTool('count'); commit(); return n;
+}
+async function countText(){
+  const q=$('cQuery').value.trim(); if(!q||!doc){$('cQuery').focus();return}
+  const word=$('cWord').checked, ql=q.toLocaleLowerCase('da'), W=/[\p{L}\p{N}]/u, hits=[], pg=autoPages();
+  for(const pi of pg){
+    for(const it of await textItems(pi)){
+      const sl=it.str.toLocaleLowerCase('da'); let k=0;
+      while((k=sl.indexOf(ql,k))>-1){
+        const end=k+ql.length;
+        if(word&&((k>0&&W.test(sl[k-1]))||(end<sl.length&&W.test(sl[end])))){k++;continue}
+        const t=(k+ql.length/2)/sl.length;
+        hits.push({pi,x:it.o[0]+(it.e[0]-it.o[0])*t+it.u[0]/2,y:it.o[1]+(it.e[1]-it.o[1])*t+it.u[1]/2}); k=end;
+      }
+    }
+  }
+  if(!hits.length){toast('Fandt ikke "'+q+'"'+(pg.length>1?' i dokumentet.':' på denne side.')+(pg.length===1&&doc.numPages>1?' Prøv "Søg på alle sider".':''),4200);return}
+  const n=addHits(autoGroup(q),hits); $('cTextRow').hidden=true; renderCount();
+  toast('Fandt '+n+' × "'+q+'". Ret fejl og mangler, og tryk Godkend.',4200);
+}
+$('cText').onclick=()=>{countPick=false;const r=$('cTextRow');r.hidden=!r.hidden;if(tool!=='count')setTool('count');renderCount();if(!r.hidden)$('cQuery').focus()};
+$('cTextGo').onclick=countText;
+$('cQuery').addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();countText()}if(e.key==='Escape'){$('cTextRow').hidden=true;renderCount()}});
+$('cSimilar').onclick=()=>{if(!doc)return;if(tool!=='count')setTool('count');countPick=!countPick;$('cTextRow').hidden=true;renderCount()};
+
+/* Streger på en side som små stykker med kendetegn (størrelse, længde, antal punkter) */
+async function vecPaths(pi){
+  if(vecCache[pi])return vecCache[pi];
+  const my=gen, page=await doc.getPage(pi+1), vp=page.getViewport({scale:1}), ol=await page.getOperatorList(), O=pdfjsLib.OPS, U=pdfjsLib.Util, out=[];
+  let ctm=[1,0,0,1,0,0]; const st=[];
+  const desc=pts=>{let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9,len=0;pts.forEach((p,i)=>{x0=Math.min(x0,p[0]);x1=Math.max(x1,p[0]);y0=Math.min(y0,p[1]);y1=Math.max(y1,p[1]);if(i)len+=Math.hypot(p[0]-pts[i-1][0],p[1]-pts[i-1][1])});
+    return {x0,y0,x1,y1,w:x1-x0,h:y1-y0,cx:(x0+x1)/2,cy:(y0+y1)/2,len,n:pts.length}};
+  for(let i=0;i<ol.fnArray.length;i++){
+    const fn=ol.fnArray[i], ar=ol.argsArray[i];
+    if(fn===O.save)st.push(ctm); else if(fn===O.restore)ctm=st.pop()||ctm;
+    else if(fn===O.transform)ctm=U.transform(ctm,ar);
+    else if(fn===O.paintFormXObjectBegin){st.push(ctm);if(ar&&ar[0])ctm=U.transform(ctm,ar[0])}
+    else if(fn===O.paintFormXObjectEnd)ctm=st.pop()||ctm;
+    else if(fn===O.constructPath){
+      const m=U.transform(vp.transform,ctm), ops=ar[0], c=ar[1], P=(x,y)=>U.applyTransform([x,y],m); let j=0, cur=null;
+      const flush=()=>{if(cur&&cur.length>1)out.push(desc(cur));cur=null};
+      for(const op of ops){
+        if(op===O.moveTo){flush();cur=[P(c[j],c[j+1])];j+=2}
+        else if(op===O.lineTo){(cur=cur||[]).push(P(c[j],c[j+1]));j+=2}
+        else if(op===O.curveTo){(cur=cur||[]).push(P(c[j],c[j+1]),P(c[j+2],c[j+3]),P(c[j+4],c[j+5]));j+=6}
+        else if(op===O.curveTo2||op===O.curveTo3){(cur=cur||[]).push(P(c[j],c[j+1]),P(c[j+2],c[j+3]));j+=4}
+        else if(op===O.rectangle){flush();const x=c[j],y=c[j+1],w=c[j+2],h=c[j+3];j+=4;cur=[P(x,y),P(x+w,y),P(x+w,y+h),P(x,y+h),P(x,y)];flush()}
+        else if(op===O.closePath){if(cur&&cur.length)cur.push(cur[0])}
+      }
+      flush();
+    }
+  }
+  if(my===gen)vecCache[pi]=out;
+  return out;
+}
+function matchSymbol(tpl,paths){
+  const T={x0:Math.min(...tpl.map(t=>t.x0)),y0:Math.min(...tpl.map(t=>t.y0)),x1:Math.max(...tpl.map(t=>t.x1)),y1:Math.max(...tpl.map(t=>t.y1))};
+  const tw=T.x1-T.x0, th=T.y1-T.y0, big=Math.max(tw,th,1), tolP=Math.max(0.8,big*0.05), tc={x:(T.x0+T.x1)/2,y:(T.y0+T.y1)/2};
+  const anchor=tpl.slice().sort((a,b)=>b.len-a.len)[0];
+  const tolS=v=>Math.max(0.6,v*0.05);
+  const same=(t,q,k)=>{const w=k%2?q.h:q.w,h=k%2?q.w:q.h;return Math.abs(t.w-w)<=tolS(t.w)&&Math.abs(t.h-h)<=tolS(t.h)&&Math.abs(t.len-q.len)<=tolS(t.len)&&Math.abs(t.n-q.n)<=1};
+  const G=Math.max(big,4), grid=new Map(), key=(x,y)=>Math.floor(x/G)+','+Math.floor(y/G);
+  paths.forEach(q=>{if(q.w>big*3||q.h>big*3)return;const k=key(q.cx,q.cy);(grid.get(k)||grid.set(k,[]).get(k)).push(q)});
+  const near=(x,y,t,k)=>{const gx=Math.floor(x/G),gy=Math.floor(y/G);for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){const c=grid.get((gx+i)+','+(gy+j));if(c)for(const q of c)if(Math.abs(q.cx-x)<=tolP&&Math.abs(q.cy-y)<=tolP&&same(t,q,k))return true}return false};
+  const rot=(dx,dy,k)=>k===0?[dx,dy]:k===1?[-dy,dx]:k===2?[-dx,-dy]:[dy,-dx];
+  const hits=[], need=Math.max(1,Math.ceil(tpl.length*0.85));
+  for(const q of paths){
+    for(let k=0;k<4;k++){
+      if(!same(anchor,q,k))continue;
+      let ok=1; for(const t of tpl){if(t===anchor)continue;const [dx,dy]=rot(t.cx-anchor.cx,t.cy-anchor.cy,k);if(near(q.cx+dx,q.cy+dy,t,k))ok++;if(ok>=need)break}
+      if(ok>=need){const [dx,dy]=rot(tc.x-anchor.cx,tc.y-anchor.cy,k);const x=q.cx+dx,y=q.cy+dy;if(!hits.some(h=>Math.hypot(h.x-x,h.y-y)<Math.min(tw,th,big)/2+tolP))hits.push({x,y});break}
+    }
+  }
+  return hits;
+}
+async function findSimilar(p,r){
+  countPick=false; renderCount();
+  const pi=p.n-1, inR=q=>q.x0>=r.x-0.5&&q.x1<=r.x+r.w+0.5&&q.y0>=r.y-0.5&&q.y1<=r.y+r.h+0.5;
+  const tpl=(await vecPaths(pi)).filter(inR);
+  if(!tpl.length){toast('Der er ingen streger i rammen. Er tegningen scannet? Så kan du tælle med klik.',4800);return}
+  if(tpl.length>300){toast('Rammen indeholder for mange streger. Træk den tættere om ét symbol.',4200);return}
+  const hits=[], pg=autoPages();
+  for(const i of pg){if(pg.length>1)$('cAutoNote').textContent='Søger … side '+(i+1)+' af '+doc.numPages;(matchSymbol(tpl,await vecPaths(i))).forEach(h=>hits.push({pi:i,x:h.x,y:h.y}))}
+  const g=autoGroup('Symbol '+(S.countGroups.filter(x=>/^Symbol \d+$/.test(x.name)).length+1)), n=addHits(g,hits);
+  renderCount(); toast('Fandt '+n+' ens symbol'+(n===1?'':'er')+'. Giv optællingen et navn, ret fejl og mangler, og tryk Godkend.',5200);
+  setTimeout(()=>{$('cSessName').focus();$('cSessName').select()},50);
 }
 COLORS.concat(['#7048e8','#0ca678']).forEach(c=>{const b=document.createElement('button');b.className='sw';b.style.background=c;b.dataset.c=c;b.setAttribute('aria-label','Farve '+c);
   b.onclick=()=>{const g=activeGroup();if(!g)return;pushHist();g.color=c;commit()};$('cColor').appendChild(b)});
@@ -1777,8 +1927,8 @@ $('lExport').onclick=()=>{
   const {rows,counts}=listRows(), fmtD=t=>t?new Date(t).toLocaleString('da-DK',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
   const m=[['Nr','Side','Lag','Type','Beskrivelse','Status','Kommentar','Oprettet','Af']];
   rows.forEach((a,i)=>{const [t,d]=describe(a),l=S.layers.find(x=>x.id===a.layer);m.push([i+1,a.page+1,l?l.name:'',t,d,STATUS[a.status]||'',a.note||'',fmtD(a.created),a.author||''])});
-  const o=[['Optælling','Side','Antal']];
-  counts.forEach(c=>{const g=c.sym?{name:c.sym}:S.countGroups.find(x=>x.id===c.g);o.push([g?g.name:'',c.page+1,c.n])});
+  const o=[['Optælling','Side','Antal','Status']];
+  counts.forEach(c=>{const g=c.sym?{name:c.sym}:S.countGroups.find(x=>x.id===c.g);o.push([g?g.name:'',c.page+1,c.n,c.sym?'':g&&g.approved?'Godkendt':'Ikke godkendt'])});
   const tot={}; counts.forEach(c=>{const nm=c.sym||(S.countGroups.find(x=>x.id===c.g)||{}).name||'';tot[nm]=(tot[nm]||0)+c.n});
   if(counts.length){o.push([]);Object.entries(tot).forEach(([nm,n])=>o.push([nm,'I alt',n]))}
   S.calc=S.calc||{}; const q=[['Mængde','Antal','Enhed','Pris/faktor','Resultat','Enhed']];
@@ -2167,6 +2317,7 @@ document.addEventListener('keydown',e=>{
   if(!$('symBox').hidden){if(e.key==='Escape')$('symCancel').click();return}
   if(e.key==='Escape'&&typing(e)&&e.target.closest('#paneTool')){e.target.blur();goHome();return}
   if(typing(e))return;
+  if(countPick&&e.key==='Escape'){e.preventDefault();countPick=false;renderCount();return}
   if(polyDraw){
     if(e.key==='Enter'){e.preventDefault();finishPoly();return}
     if(e.key==='Backspace'){e.preventDefault();polyDraw.pts.splice(-2,2);if(!polyDraw.pts.length)cancelPoly();else renderAnn(polyDraw.p);return}
