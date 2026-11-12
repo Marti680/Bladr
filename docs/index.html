@@ -224,6 +224,13 @@ kbd{font:11px var(--mono);border:1px solid var(--line);border-bottom-width:2px;b
 .sigcol{width:26px;height:26px;border-radius:50%;border:2px solid var(--panel);box-shadow:0 0 0 1px var(--line);padding:0}
 .sigcol[aria-pressed="true"]{box-shadow:0 0 0 2px var(--fg)}
 .cgroups{display:flex;flex-direction:column;gap:2px}
+.sides{display:flex;flex-direction:column;gap:4px;border-top:1px solid var(--line);padding-top:9px}
+.sides h4{margin:0 0 2px;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.sides .srow{display:flex;align-items:center;gap:8px}
+.sides .srow span{flex:1;min-width:0;font-size:12.5px}
+.sides .srow.ang span{padding-left:12px;color:var(--muted)}
+.sides .srow input{width:96px;flex:none}
+.sides .srow input[readonly]{opacity:.65}
 .csess{border:1px solid var(--accent);border-radius:8px;padding:9px;display:flex;flex-direction:column;gap:7px;background:var(--accent-soft)}
 .csess-h{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .csess-h b{font-family:var(--mono);font-size:14px;letter-spacing:0;text-transform:none;color:var(--fg)}
@@ -456,7 +463,12 @@ table.calc .ct{width:44px}
         <select class="sel" id="pEnds"><option value="tick">Tværstreger</option><option value="arrow">Pile</option></select></div>
       <div class="prow" id="rDim"><span class="plabel">Mål</span><div class="pair">
         <label class="check"><input type="checkbox" id="pDim"> Vis mål</label>
-        <select class="sel" id="pDimKind" aria-label="Diameter eller radius"><option value="d">Diameter</option><option value="r">Radius</option></select></div></div>
+        <select class="sel" id="pDimKind" aria-label="Diameter eller radius"><option value="d">Diameter</option><option value="r">Radius</option></select>
+        <label class="check" id="lSides"><input type="checkbox" id="pSides"> Vis sidelængder</label></div></div>
+      <div class="prow" id="rDimLook"><span class="plabel">Måltekst</span><div class="pair">
+        <label class="check"><input type="checkbox" id="pDimBg"> Hvid baggrund</label>
+        <select class="sel" id="pDimDir" aria-label="Retning på måltekst"><option value="auto">Automatisk retning</option><option value="h">Vandret</option><option value="v">Lodret</option><option value="c">Drej selv</option></select></div></div>
+      <div class="prow" id="rDimDeg"><label class="plabel" for="pDimDeg">Drejning (°)</label><div class="pair"><input class="num" id="pDimDeg" inputmode="decimal"><button type="button" class="ghost" id="pDimRot" title="Drej teksten 90° mere">↺ 90°</button></div></div>
       <div class="prow" id="rLabel"><label class="plabel" for="pLabelMode">Tekst på mål</label>
         <select class="sel" id="pLabelMode"><option value="auto">Automatisk</option><option value="manual">Skriv selv</option></select></div>
       <button type="button" class="linkbtn" id="pLabReset">Flyt målet tilbage ved figuren</button>
@@ -479,6 +491,7 @@ table.calc .ct{width:44px}
       <button type="button" class="linkbtn" id="uSet">Skift enheder for denne PDF</button>
       <div class="prow" id="rG1"><label class="plabel" for="g1" id="g1l">Længde</label><input class="num" id="g1" inputmode="decimal"></div>
       <div class="prow" id="rG2"><label class="plabel" for="g2" id="g2l">Vinkel</label><input class="num" id="g2" inputmode="decimal"></div>
+      <div id="rSides" class="sides" hidden></div>
       <div id="rArea" style="display:flex;flex-direction:column;gap:9px">
         <div class="prow"><span class="plabel">Huller</span><div class="pair"><button type="button" class="ghost" id="aHole">+ Træk hul fra</button><button type="button" class="ghost" id="aHoleDel" title="Fjern det sidst tilføjede hul">Fjern sidste</button></div></div>
         <div class="prow"><label class="plabel" for="aVdir">Rumfang</label><select class="sel" id="aVdir" style="max-width:none"><option value="">Intet rumfang</option><option value="cut">Udgravning – hul (fx kabelgrav)</option><option value="fill">Opbygning – stikker op (fx bygning)</option></select></div>
@@ -660,7 +673,7 @@ table.calc .ct{width:44px}
       <div class="helpcode"><code id="helpCmd">irm https://marti680.github.io/Bladr/windows-filikon.txt | iex</code><button type="button" class="ghost" id="helpCopy">Kopiér</button></div>
       <p>Står ikonerne stadig blanke bagefter, så genstart computeren. Kør linjen igen, hvis ikonerne bliver blanke efter en opdatering af Chrome. Linjen ændrer kun dine egne indstillinger og kan køres flere gange. <a href="https://marti680.github.io/Bladr/windows-filikon.txt" target="_blank" rel="noopener">Se hvad den gør</a>.</p>
     </fieldset>
-    <p class="pnote">Bladr version 2026.11.11-1930</p>
+    <p class="pnote">Bladr version 2026.11.12-1511</p>
     <div class="row end"><button type="button" class="ghost" id="setCancel">Annullér</button><button class="primary" type="submit">Gem</button></div>
   </form>
 </div>
@@ -735,7 +748,7 @@ function cloudCircleOps(cx,cy,r,width){
 function labelPrims(out, l, color){
   const c = Math.cos(l.rot||0), s = Math.sin(l.rot||0), R = (px,py) => [l.x+px*c-py*s, l.y+px*s+py*c];
   const hw = l.w/2, hh = l.h/2, p = [R(-hw,-hh),R(hw,-hh),R(hw,hh),R(-hw,hh)];
-  out.push({k:'path', ops:[['M',...p[0]],['L',...p[1]],['L',...p[2]],['L',...p[3]],['Z']], stroke:null, fill:'#ffffff'});
+  if(l.bg !== false) out.push({k:'path', ops:[['M',...p[0]],['L',...p[1]],['L',...p[2]],['L',...p[3]],['Z']], stroke:null, fill:'#ffffff'});
   const lines = String(l.str).split('\n'), top = -hh + l.size*0.2;
   lines.forEach((ln,i) => { const lw = measureFn(ln, l.size), t = R(-lw/2, top + l.size*0.85 + i*l.size*1.25);
     out.push({k:'text', x:t[0], y:t[1], str:ln, size:l.size, color, rot:l.rot||0}); });
@@ -767,7 +780,17 @@ function dimLabels(a, ctx){
     const c = centroid(a.pts), o = off(a.lo), net = areaNet(a), lines = ['A = '+fmtArea(net, ctx)+((a.holes&&a.holes.length)?' (netto)':''), 'O = '+F(polyLen(a.pts,true))];
     const v = volumeM3(a, ctx); if(v != null) lines.push('V = '+(a.vdir==='cut'?'-':'+')+fmtNum(v, ctx&&ctx.dec&&ctx.dec!=='auto'?+ctx.dec:2)+' m³ '+(a.vdir==='cut'?'udgravning':'opbygning'));
     L.push({key:'lo', str:lines.join('\n'), x:c[0]+o.x, y:c[1]+o.y, rot:0, size:s});
-  } else if(a.type==='angle' && a.pts && a.pts.length === 6){
+  }
+  if(a.type==='area' && a.showSides && a.pts && a.pts.length >= 6){
+    const p = a.pts, n = p.length/2;
+    for(let i=0;i<n;i++){
+      const j = (i+1)%n, x1=p[2*i], y1=p[2*i+1], x2=p[2*j], y2=p[2*j+1], d=Math.hypot(x2-x1,y2-y1); if(d < 1) continue;
+      const ux=(x2-x1)/d, uy=(y2-y1)/d, mx=(x1+x2)/2, my=(y1+y2)/2, g = s*0.65 + w/2 + 3 + (a.dash==='cloud' ? (10+2*w)/2 : 0);
+      const out = inPoly(p, mx+uy*0.5, my-ux*0.5) ? -1 : 1, o = off(a['as'+i]);
+      L.push({key:'as'+i, str:F(d), x:mx+uy*g*out+o.x, y:my-ux*g*out+o.y, rot:normRot(Math.atan2(uy,ux)), size:s});
+    }
+  }
+  if(a.type==='angle' && a.pts && a.pts.length === 6){
     const g = angleGeom(a), o = off(a.lo);
     L.push({key:'lo', str:fmtNum(g.deg,1)+'°', x:g.vx+g.bx*(g.r+s*1.3)+o.x, y:g.vy+g.by*(g.r+s*1.3)+o.y, rot:0, size:s});
   } else if(a.type==='circle' && a.showDim){
@@ -775,6 +798,8 @@ function dimLabels(a, ctx){
     if(a.dimKind==='r') L.push({key:'lo', str:'R '+F(a.r), x:a.cx+a.r/2+o.x, y:a.cy-g+o.y, rot:0, size:s});
     else L.push({key:'lo', str:'Ø '+F(2*a.r), x:a.cx+o.x, y:a.cy-g+o.y, rot:0, size:s});
   }
+  const dir = a.dimDir, fixed = dir==='h' ? 0 : dir==='v' ? -Math.PI/2 : dir==='c' ? -(+a.dimDeg||0)*Math.PI/180 : null;
+  L.forEach(l => { if(fixed != null) l.rot = fixed; l.bg = a.dimBg !== false; });
   L.forEach(l => { const ls = String(l.str).split('\n'); l.w = Math.max(...ls.map(x => measureFn(x, l.size))) + 6; l.h = l.size*(0.4 + 1.25*ls.length) - l.size*0.35; });
   return L;
 }
@@ -790,6 +815,40 @@ function smoothOps(P){
 function b64Bytes(src){ const b = src.slice(src.indexOf(',')+1);
   if(typeof atob === 'function'){ const s = atob(b), u = new Uint8Array(s.length); for(let i=0;i<s.length;i++) u[i]=s.charCodeAt(i); return u; }
   return Uint8Array.from(Buffer.from(b,'base64')); }
+function inPoly(p, x, y){ let c = false; const n = p.length/2;
+  for(let i=0,j=n-1;i<n;j=i++){ const xi=p[2*i], yi=p[2*i+1], xj=p[2*j], yj=p[2*j+1];
+    if(((yi>y)!==(yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi)+xi)) c = !c; } return c; }
+/* Vinkler i en polylinje/et areal i grader. Areal: indvendig vinkel ved hvert hjørne. Polylinje: vinklen mellem de to stykker (0–180) ved de indre punkter. */
+function polyAngles(p, closed){
+  const n = p.length/2, out = new Array(n).fill(null), raw = new Array(n).fill(null);
+  for(let i=0;i<n;i++){
+    if(!closed && (i===0 || i===n-1)) continue;
+    const a = (i-1+n)%n, b = (i+1)%n, t = Math.atan2(p[2*a+1]-p[2*i+1], p[2*a]-p[2*i]) - Math.atan2(p[2*b+1]-p[2*i+1], p[2*b]-p[2*i]);
+    raw[i] = t;
+  }
+  let flip = false;
+  if(closed){ const tw = raw.map(t => ((t % (2*Math.PI)) + 2*Math.PI) % (2*Math.PI)), S = tw.reduce((x,y) => x+y, 0);
+    flip = Math.abs(S-(n+2)*Math.PI) < Math.abs(S-(n-2)*Math.PI);
+    tw.forEach((t,i) => out[i] = (flip ? 2*Math.PI-t : t)*180/Math.PI); }
+  else raw.forEach((t,i) => { if(t==null) return; while(t > Math.PI) t -= 2*Math.PI; while(t <= -Math.PI) t += 2*Math.PI; out[i] = Math.abs(t)*180/Math.PI; raw[i] = t; });
+  return {deg:out, raw, flip};
+}
+/* Sæt længden på side i (punkt i til i+1). Punkterne efter flytter med. */
+function setPolySide(p, i, L){
+  const n = p.length/2, j = i+1; if(j >= n) return;
+  let dx = p[2*j]-p[2*i], dy = p[2*j+1]-p[2*i+1], d = Math.hypot(dx,dy); if(d < 1e-9){ dx = 1; dy = 0; d = 1; }
+  const mx = dx/d*(L-d), my = dy/d*(L-d); for(let k=j;k<n;k++){ p[2*k] += mx; p[2*k+1] += my; }
+}
+/* Sæt vinklen ved hjørne i (grader). Punkterne efter drejer med rundt om hjørnet. */
+function setPolyAngle(p, i, deg, closed){
+  const n = p.length/2, A = polyAngles(p, closed), cur = A.deg[i]; if(cur == null || i < 1 || i > n-2) return;
+  const phi = deg*Math.PI/180, al = cur*Math.PI/180;
+  let delta;
+  if(closed) delta = A.flip ? (phi-al) : (al-phi);
+  else { const t = A.raw[i], target = (t < 0 ? -1 : 1)*phi; delta = t - target; }
+  const cx = p[2*i], cy = p[2*i+1], c = Math.cos(delta), s = Math.sin(delta);
+  for(let k=i+1;k<n;k++){ const dx = p[2*k]-cx, dy = p[2*k+1]-cy; p[2*k] = cx+dx*c-dy*s; p[2*k+1] = cy+dx*s+dy*c; }
+}
 function polyLen(p, closed){ let L=0; for(let i=2;i<p.length;i+=2) L+=Math.hypot(p[i]-p[i-2],p[i+1]-p[i-1]);
   if(closed && p.length>=6) L+=Math.hypot(p[0]-p[p.length-2],p[1]-p[p.length-1]); return L; }
 function polyArea(p){ let s=0; const n=p.length/2; for(let i=0;i<n;i++){ const j=(i+1)%n; s+=p[2*i]*p[2*j+1]-p[2*j]*p[2*i+1]; } return Math.abs(s)/2; }
@@ -1218,7 +1277,7 @@ async function rasterizePdf(pdfjsLib, PDFLib, bytes, o){
   return out.save();
 }
 
-return {readAnnots, areaNet, volumeM3, angleGeom, fmtNum, cloudPoly, polyLen, polyArea, fmtArea, stampBox, markerOps, rasterizePdf, dimLabels, setMeasure, fmtLen, prims, primsToSvg, textBox, bbox, buildPdf, PT_MM, FILLS, rectOps, circleOps, opsToD};
+return {readAnnots, polyAngles, setPolySide, setPolyAngle, inPoly, areaNet, volumeM3, angleGeom, fmtNum, cloudPoly, polyLen, polyArea, fmtArea, stampBox, markerOps, rasterizePdf, dimLabels, setMeasure, fmtLen, prims, primsToSvg, textBox, bbox, buildPdf, PT_MM, FILLS, rectOps, circleOps, opsToD};
 })();
 
 
@@ -1435,6 +1494,7 @@ function renderAnn(p){
   if(sel){
     const b=C.bbox(sel),pd=4/s,hs=9/s,sw=1.2/s;
     html+=`<rect x="${b.x-pd}" y="${b.y-pd}" width="${b.w+2*pd}" height="${b.h+2*pd}" fill="none" stroke="#1f5f8b" stroke-width="${sw}" stroke-dasharray="${4/s} ${3/s}"/>`;
+    html+=`<g pointer-events="none">${sidesOverlay(sel,s)}</g>`;
     handlesOf(sel).forEach(h=>{html+=`<rect class="hd" data-h="${h.k}" x="${h.x-hs/2}" y="${h.y-hs/2}" width="${hs}" height="${hs}" fill="#ffffff" stroke="#1f5f8b" stroke-width="${sw*1.3}"/>`});
   }
   if(drag&&drag.preview&&drag.p===p) html+=drag.preview;
@@ -1674,11 +1734,15 @@ function updProps(){
     $('pArrS').setAttribute('aria-pressed',!!src.arrowStart);$('pArrE').setAttribute('aria-pressed',!!src.arrowEnd);
     show('rEnds',k==='measure'); setVal('pEnds',src.ends||'tick');
     show('rDim',shape||k==='poly'||k==='area'); $('pDim').checked=k==='area'?src.showDim!==false:!!src.showDim; $('pDim').parentNode.lastChild.textContent=k==='poly'?' Vis delmål':k==='area'?' Vis areal og mål':' Vis mål'; show('pDimKind',k==='circle'); setVal('pDimKind',src.dimKind||'d');
+    show('lSides',k==='area'); $('pSides').checked=!!src.showSides;
+    const hasLab=['measure','poly','area','angle'].includes(k)||(shape&&!!src.showDim);
+    show('rDimLook',hasLab); $('pDimBg').checked=src.dimBg!==false; setVal('pDimDir',src.dimDir||'auto');
+    show('rDimDeg',hasLab&&src.dimDir==='c'); setVal('pDimDeg',fmtNum(+src.dimDeg||0,1));
     show('rLabel',k==='measure'&&!!t.a); const manual=!!(t.a&&t.a.label);
     setVal('pLabelMode',manual?'manual':'auto'); show('rLabelTxt',k==='measure'&&manual); if(t.a)setVal('pLabel',t.a.label||'');
     show('rSize',['text','callout','measure','poly','area','angle','stamp'].includes(k)||(shape&&!!src.showDim)); setVal('pSize',String(src.size||10));
     $('rSize').querySelector('.plabel').textContent=k==='stamp'?'Størrelse':'Tekststørrelse';
-    show('pLabReset',!!(t.a&&(t.a.lo||t.a.lo2)));
+    show('pLabReset',!!(t.a&&Object.keys(t.a).some(x=>LABKEY.test(x))));
     show('rLayer',!!t.a&&S.layers.length>1);
     if(t.a){$('pLayer').innerHTML=S.layers.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('');$('pLayer').value=t.a.layer}
     show('pDel',!!t.a);
@@ -1702,11 +1766,20 @@ $('pSize').onchange=e=>{setProp('size',num(e.target.value));if(editingId)placeEd
 $('pEnds').onchange=e=>setProp('ends',e.target.value);
 $('pDim').onchange=e=>setProp('showDim',e.target.checked);
 $('pDimKind').onchange=e=>setProp('dimKind',e.target.value);
+$('pSides').onchange=e=>setProp('showSides',e.target.checked);
+$('pDimBg').onchange=e=>setProp('dimBg',e.target.checked);
+$('pDimDir').onchange=e=>{const t=propTarget(),v=e.target.value;if(!t)return;const src=t.a||defaults[t.kind];
+  if(v==='c'&&src.dimDeg==null){const L=t.a?C.dimLabels(t.a,annCtx(t.a.page+1)):[];const d=L.length?Math.round(-L[0].rot*180/Math.PI*10)/10:0;if(t.a)t.a.dimDeg=((d%360)+360)%360;else src.dimDeg=0}
+  setProp('dimDir',v==='auto'?undefined:v);if(v==='c')setTimeout(()=>{$('pDimDeg').focus();$('pDimDeg').select()},20)};
+function setDimDeg(){const v=num($('pDimDeg').value);if(!isFinite(v)){updProps();return}setProp('dimDeg',((v%360)+360)%360)}
+$('pDimDeg').addEventListener('change',setDimDeg);$('pDimDeg').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();setDimDeg();e.target.select()}});
+$('pDimRot').onclick=()=>{const t=propTarget();if(!t)return;const v=+((t.a||defaults[t.kind]).dimDeg)||0;setProp('dimDeg',(v+90)%360)};
 $('pArrS').onclick=()=>{const t=propTarget();if(t)setProp('arrowStart',!(t.a||defaults[t.kind]).arrowStart)};
 $('pArrE').onclick=()=>{const t=propTarget();if(t)setProp('arrowEnd',!(t.a||defaults[t.kind]).arrowEnd)};
 $('pLayer').onchange=e=>{const t=propTarget();if(t&&t.a){pushHist();t.a.layer=e.target.value;if(!layerVisible(t.a.layer))selId=null;commit()}};
 $('pDel').onclick=()=>delSel();
-$('pLabReset').onclick=()=>{const t=propTarget();if(!t||!t.a)return;pushHist();delete t.a.lo;delete t.a.lo2;commit()};
+const LABKEY=/^(lo|lo2|ls\d+|as\d+)$/;
+$('pLabReset').onclick=()=>{const t=propTarget();if(!t||!t.a)return;pushHist();Object.keys(t.a).filter(x=>LABKEY.test(x)).forEach(x=>delete t.a[x]);commit()};
 $('pLabelMode').onchange=e=>{const t=propTarget();if(!t||!t.a)return;pushHist();
   t.a.label=e.target.value==='manual'?C.fmtLen(Math.hypot(t.a.x2-t.a.x1,t.a.y2-t.a.y1),annCtx(t.a.page+1)):'';commit();
   if(t.a.label)setTimeout(()=>{$('pLabel').focus();$('pLabel').select()},20)};
@@ -1732,7 +1805,7 @@ function geoFields(a){
   if(a.type==='circle')return [{k:'d',l:'Diameter',v:2*a.r},{k:'r',l:'Radius',v:a.r}];
   if(a.type==='poly')return [{k:'plen',l:'Længde i alt',v:C.polyLen(a.pts,false),ro:1},{k:'pn',l:'Punkter',v:a.pts.length/2,ro:1,raw:1}];
   if(a.type==='area')return [{k:'ar',l:(a.holes&&a.holes.length)?'Areal, netto':'Areal',v:C.areaNet(a),ro:1,area:1},{k:'om',l:'Omkreds',v:C.polyLen(a.pts,true),ro:1}];
-  if(a.type==='angle'&&a.pts.length===6)return [{k:'deg',l:'Vinkel (°)',v:C.angleGeom(a).deg,ro:1,ang:1}];
+  if(a.type==='angle'&&a.pts.length===6)return [{k:'deg',l:'Vinkel (°)',v:C.angleGeom(a).deg,ang:1}];
   return null;
 }
 function updGeo(){
@@ -1749,6 +1822,7 @@ function updGeo(){
     $('g'+n+'l').textContent=fd.ang||fd.raw?fd.l:fd.l+' ('+U.s+(fd.area?'²':'')+')'; inp.readOnly=!!fd.ro;
     setVal('g'+n,fd.ang?fmtNum(fd.v,1):fd.raw?String(fd.v):fd.area?fmtNum(fromPt2(fd.v,u,a.page),prec(U)):fmtNum(fromPt(fd.v,u,a.page),prec(U)));
   });
+  renderSides(a,u);
   /* areal: huller og rumfang */
   const isArea=!!(a&&a.type==='area'); $('rArea').hidden=!isArea; if(!isArea)return;
   const nh=(a.holes||[]).length; $('aHoleDel').disabled=!nh; $('aHoleDel').textContent=nh?'Fjern sidste ('+nh+')':'Fjern sidste';
@@ -1759,6 +1833,67 @@ function updGeo(){
   $('aVolNote').textContent=!a.vdir?'Vælg udgravning eller opbygning for at få rumfanget.':!pageScale(a.page)?'Rumfang kræver, at siden har en skala.':!a.depth?'Skriv '+(a.vdir==='fill'?'højden':'dybden')+' for at få rumfanget.':'Rumfang: '+fmtNum(v,2)+' m³ '+(a.vdir==='cut'?'udgravning':'opbygning')+'.';
   $('aVolNote').classList.toggle('warn',!!a.vdir&&!pageScale(a.page));
 }
+/* sider og vinkler på polylinjer og arealer */
+let sidesKey='', geoHi=null;
+function renderSides(a,u){
+  const box=$('rSides'), ok=!!(a&&(a.type==='poly'||a.type==='area')&&a.pts&&a.pts.length>=(a.type==='area'?6:4));
+  box.hidden=!ok; if(!ok){sidesKey='';return}
+  const closed=a.type==='area', p=a.pts, n=p.length/2, U=UNITS[u], key=a.id+':'+n+':'+u;
+  if(key!==sidesKey){
+    sidesKey=key; let h=`<h4>Sider og vinkler</h4>`;
+    const row=(lab,attr,ro,cls)=>`<div class="srow${cls?' '+cls:''}"><span>${lab}</span><input class="num" inputmode="decimal" ${attr}${ro?' readonly tabindex="-1"':''}></div>`;
+    const ns=closed?n:n-1;
+    for(let i=0;i<ns;i++){
+      const j=(i+1)%n, last=closed&&i===n-1;
+      h+=row(`Side ${i+1}–${j+1}${last?' <small>(lukker)</small>':''} (${U.s})`,`data-side="${i}"`,last);
+      if(i+1<n-1||(closed&&i+1===n-1)) if(j>0) h+=row(`Vinkel ved ${j+1} (°)`,`data-corner="${j}"`,closed&&j===n-1,'ang');
+    }
+    if(closed) h+=row('Vinkel ved 1 (°)','data-corner="0"',true,'ang');
+    h+=`<p class="pnote">${closed?'Skriv et mål og tryk Enter. Punkterne efter flytter med. Den sidste side og vinklerne ved punkt 1 og '+n+' lukker figuren og regnes ud af sig selv. Tallene står ved hjørnerne på tegningen.':'Skriv et mål og tryk Enter. Punkterne efter flytter med. Tallene står ved punkterne på tegningen.'}</p>`;
+    box.innerHTML=h;
+    box.querySelectorAll('input').forEach(inp=>{
+      if(inp.readOnly)return;
+      inp.addEventListener('focus',()=>{geoHi=inp.dataset.side!=null?{side:+inp.dataset.side}:{corner:+inp.dataset.corner};renderAnn(pages[a.page]);inp.select()});
+      inp.addEventListener('blur',()=>{geoHi=null;const b=S.annots.find(x=>x.id===selId);if(b)renderAnn(pages[b.page])});
+      inp.addEventListener('change',()=>setSide(inp));
+      inp.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();setSide(inp);inp.select()}if(e.key==='Escape'){inp.blur()}});
+    });
+  }
+  const A=C.polyAngles(p,closed);
+  box.querySelectorAll('input').forEach(inp=>{
+    if(document.activeElement===inp)return;
+    if(inp.dataset.side!=null){const i=+inp.dataset.side,j=(i+1)%n;inp.value=fmtNum(fromPt(Math.hypot(p[2*j]-p[2*i],p[2*j+1]-p[2*i+1]),u,a.page),prec(U))}
+    else {const v=A.deg[+inp.dataset.corner];inp.value=v==null?'':fmtNum(v,1)}
+  });
+}
+function setSide(inp){
+  const a=selId&&S.annots.find(x=>x.id===selId); if(!a||!a.pts)return;
+  const v=num(inp.value), closed=a.type==='area'; if(!isFinite(v)){updGeo();return}
+  if(inp.dataset.side!=null){
+    const pt=toPt(v,inUnit(a.page),a.page); if(pt==null){toast('Sæt skala først for at bruge virkelige mål.');updGeo();return} if(!(pt>0)){updGeo();return}
+    pushHist(); C.setPolySide(a.pts,+inp.dataset.side,pt);
+  } else {
+    if(!(v>0&&v<(closed?360:180.0001))){toast(closed?'Vinklen skal være mellem 0 og 360°.':'Vinklen skal være mellem 0 og 180°.');updGeo();return}
+    pushHist(); C.setPolyAngle(a.pts,+inp.dataset.corner,v,closed);
+  }
+  commit();
+}
+function sidesOverlay(a,s){
+  if(!a.pts||(a.type!=='poly'&&a.type!=='area'))return '';
+  const p=a.pts,n=p.length/2,closed=a.type==='area'; let h='';
+  if(geoHi){
+    if(geoHi.side!=null){const i=geoHi.side,j=(i+1)%n;h+=`<path d="M${p[2*i]} ${p[2*i+1]}L${p[2*j]} ${p[2*j+1]}" stroke="#f08c00" stroke-opacity=".55" stroke-width="${7/s}" stroke-linecap="round" fill="none"/>`}
+    else {const i=geoHi.corner;h+=`<circle cx="${p[2*i]}" cy="${p[2*i+1]}" r="${11/s}" fill="#f08c00" fill-opacity=".35" stroke="#f08c00" stroke-width="${1.5/s}"/>`}
+  }
+  const r=7/s, c=closed?C.inPoly:null;
+  for(let i=0;i<n;i++){
+    let dx=10/s,dy=-10/s;
+    if(closed){const a0=(i-1+n)%n,b0=(i+1)%n,ux=(p[2*a0]+p[2*b0])/2-p[2*i],uy=(p[2*a0+1]+p[2*b0+1])/2-p[2*i+1],d=Math.hypot(ux,uy)||1;let sx=-ux/d,sy=-uy/d;if(c(p,p[2*i]+sx*2/s,p[2*i+1]+sy*2/s)){sx=-sx;sy=-sy}dx=sx*13/s;dy=sy*13/s}
+    const x=p[2*i]+dx,y=p[2*i+1]+dy;
+    h+=`<circle cx="${x}" cy="${y}" r="${r}" fill="#1f5f8b"/><text x="${x}" y="${y+3.6/s}" font-size="${10/s}" font-family="system-ui,sans-serif" font-weight="600" fill="#fff" text-anchor="middle">${i+1}</text>`;
+  }
+  return h;
+}
 $('aHole').onclick=()=>{const a=selId&&S.annots.find(x=>x.id===selId);if(!a||a.type!=='area')return;holeTarget=a.id;setTool('hole');toast('Klik rundt om hullet. Enter eller klik på startpunktet lukker det.',4000)};
 $('aHoleDel').onclick=()=>{const a=selId&&S.annots.find(x=>x.id===selId);if(!a||!(a.holes||[]).length)return;pushHist();a.holes.pop();commit()};
 $('aVdir').onchange=e=>{const a=selId&&S.annots.find(x=>x.id===selId);if(!a)return;pushHist();a.vdir=e.target.value||undefined;commit();if(a.vdir&&!a.depth)setTimeout(()=>$('aDepth').focus(),20)};
@@ -1767,13 +1902,15 @@ $('aDepth').addEventListener('change',setDepth);$('aDepth').addEventListener('ke
 function setGeo(inp){
   const a=selId&&S.annots.find(x=>x.id===selId); if(!a)return;
   const k=inp.dataset.k, v=num(inp.value); if(!isFinite(v)){updGeo();return}
-  let pt=null; if(k!=='ang'){pt=toPt(v,inUnit(),a.page);if(pt==null){toast('Sæt skala først for at bruge virkelige mål.');updGeo();return} if(!(pt>0)){updGeo();return}}
+  if(k==='deg'&&!(v>0&&v<=180)){toast('Vinklen skal være mellem 0 og 180°.');updGeo();return}
+  let pt=null; if(k!=='ang'&&k!=='deg'){pt=toPt(v,inUnit(),a.page);if(pt==null){toast('Sæt skala først for at bruge virkelige mål.');updGeo();return} if(!(pt>0)){updGeo();return}}
   pushHist();
   if(a.type==='line'||a.type==='measure'){
     const d=Math.hypot(a.x2-a.x1,a.y2-a.y1), ang=(k==='ang'?v:angOf(a))*Math.PI/180, L=k==='len'?pt:d;
     a.x2=a.x1+Math.cos(ang)*L; a.y2=a.y1-Math.sin(ang)*L;
   } else if(a.type==='rect'){ if(k==='w')a.w=pt; else a.h=pt }
   else if(a.type==='circle'){ a.r=k==='d'?pt/2:pt }
+  else if(a.type==='angle'){ const g=C.angleGeom(a),p=a.pts,l2=Math.hypot(p[4]-p[2],p[5]-p[3]),t=g.a1+(g.d<0?-1:1)*v*Math.PI/180; p[4]=p[2]+Math.cos(t)*l2; p[5]=p[3]+Math.sin(t)*l2 }
   commit();
 }
 ['g1','g2'].forEach(id=>{const el=$(id);el.addEventListener('change',()=>setGeo(el));el.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();setGeo(el);el.select()}})});
@@ -2298,7 +2435,7 @@ $('fNote').addEventListener('blur',()=>{if(noteEditing){if(!noteEditing.note)del
 $('fNote').addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Escape')e.target.blur()});
 
 /* ---------- værktøjskasse og symboler ---------- */
-const STYLEKEYS=['color','width','dash','fill','size','arrowStart','arrowEnd','showDim','dimKind','ends','label','showName','showDate'];
+const STYLEKEYS=['color','width','dash','fill','size','arrowStart','arrowEnd','showDim','dimKind','showSides','dimBg','dimDir','dimDeg','ends','label','showName','showDate'];
 let activeKit=null, kitApplying=false, kitEditing=null, pendingSym=null;
 function loadKit(){try{return JSON.parse(localStorage.getItem('bladr:kit')||'[]')||[]}catch{return []}}
 function storeKit(l){try{localStorage.setItem('bladr:kit',JSON.stringify(l));return true}catch{return false}}

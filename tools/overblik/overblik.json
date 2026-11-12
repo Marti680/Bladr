@@ -1,5 +1,5 @@
 {
- "opdateret": "11.11.2026",
+ "opdateret": "12.11.2026",
  "funktioner": [
   [
    "Læsning og navigation",
@@ -37,7 +37,10 @@
     "Figurer ud fra indtastede mål (længde, vinkel, bredde, højde, radius, diameter) i virkelige mål eller papirmål",
     "Huller trukket fra i arealer (nettoareal)",
     "Vinkelmåling med tre klik",
-    "Rumfang ud fra areal og dybde/højde, vist som udgravning (fx kabelgrav) eller opbygning (fx bygning)"
+    "Rumfang ud fra areal og dybde/højde, vist som udgravning (fx kabelgrav) eller opbygning (fx bygning)",
+    "Ret længder og vinkler direkte på polylinjer og arealer (side for side og hjørne for hjørne) samt på vinkelmålinger",
+    "Vis sidelængder på arealer",
+    "Måltekst med eller uden hvid baggrund, og retning automatisk, vandret, lodret eller drejet efter eget valg"
    ]
   ],
   [

@@ -62,7 +62,7 @@ function cloudCircleOps(cx,cy,r,width){
 function labelPrims(out, l, color){
   const c = Math.cos(l.rot||0), s = Math.sin(l.rot||0), R = (px,py) => [l.x+px*c-py*s, l.y+px*s+py*c];
   const hw = l.w/2, hh = l.h/2, p = [R(-hw,-hh),R(hw,-hh),R(hw,hh),R(-hw,hh)];
-  out.push({k:'path', ops:[['M',...p[0]],['L',...p[1]],['L',...p[2]],['L',...p[3]],['Z']], stroke:null, fill:'#ffffff'});
+  if(l.bg !== false) out.push({k:'path', ops:[['M',...p[0]],['L',...p[1]],['L',...p[2]],['L',...p[3]],['Z']], stroke:null, fill:'#ffffff'});
   const lines = String(l.str).split('\n'), top = -hh + l.size*0.2;
   lines.forEach((ln,i) => { const lw = measureFn(ln, l.size), t = R(-lw/2, top + l.size*0.85 + i*l.size*1.25);
     out.push({k:'text', x:t[0], y:t[1], str:ln, size:l.size, color, rot:l.rot||0}); });
@@ -94,7 +94,17 @@ function dimLabels(a, ctx){
     const c = centroid(a.pts), o = off(a.lo), net = areaNet(a), lines = ['A = '+fmtArea(net, ctx)+((a.holes&&a.holes.length)?' (netto)':''), 'O = '+F(polyLen(a.pts,true))];
     const v = volumeM3(a, ctx); if(v != null) lines.push('V = '+(a.vdir==='cut'?'-':'+')+fmtNum(v, ctx&&ctx.dec&&ctx.dec!=='auto'?+ctx.dec:2)+' m³ '+(a.vdir==='cut'?'udgravning':'opbygning'));
     L.push({key:'lo', str:lines.join('\n'), x:c[0]+o.x, y:c[1]+o.y, rot:0, size:s});
-  } else if(a.type==='angle' && a.pts && a.pts.length === 6){
+  }
+  if(a.type==='area' && a.showSides && a.pts && a.pts.length >= 6){
+    const p = a.pts, n = p.length/2;
+    for(let i=0;i<n;i++){
+      const j = (i+1)%n, x1=p[2*i], y1=p[2*i+1], x2=p[2*j], y2=p[2*j+1], d=Math.hypot(x2-x1,y2-y1); if(d < 1) continue;
+      const ux=(x2-x1)/d, uy=(y2-y1)/d, mx=(x1+x2)/2, my=(y1+y2)/2, g = s*0.65 + w/2 + 3 + (a.dash==='cloud' ? (10+2*w)/2 : 0);
+      const out = inPoly(p, mx+uy*0.5, my-ux*0.5) ? -1 : 1, o = off(a['as'+i]);
+      L.push({key:'as'+i, str:F(d), x:mx+uy*g*out+o.x, y:my-ux*g*out+o.y, rot:normRot(Math.atan2(uy,ux)), size:s});
+    }
+  }
+  if(a.type==='angle' && a.pts && a.pts.length === 6){
     const g = angleGeom(a), o = off(a.lo);
     L.push({key:'lo', str:fmtNum(g.deg,1)+'°', x:g.vx+g.bx*(g.r+s*1.3)+o.x, y:g.vy+g.by*(g.r+s*1.3)+o.y, rot:0, size:s});
   } else if(a.type==='circle' && a.showDim){
@@ -102,6 +112,8 @@ function dimLabels(a, ctx){
     if(a.dimKind==='r') L.push({key:'lo', str:'R '+F(a.r), x:a.cx+a.r/2+o.x, y:a.cy-g+o.y, rot:0, size:s});
     else L.push({key:'lo', str:'Ø '+F(2*a.r), x:a.cx+o.x, y:a.cy-g+o.y, rot:0, size:s});
   }
+  const dir = a.dimDir, fixed = dir==='h' ? 0 : dir==='v' ? -Math.PI/2 : dir==='c' ? -(+a.dimDeg||0)*Math.PI/180 : null;
+  L.forEach(l => { if(fixed != null) l.rot = fixed; l.bg = a.dimBg !== false; });
   L.forEach(l => { const ls = String(l.str).split('\n'); l.w = Math.max(...ls.map(x => measureFn(x, l.size))) + 6; l.h = l.size*(0.4 + 1.25*ls.length) - l.size*0.35; });
   return L;
 }
@@ -117,6 +129,40 @@ function smoothOps(P){
 function b64Bytes(src){ const b = src.slice(src.indexOf(',')+1);
   if(typeof atob === 'function'){ const s = atob(b), u = new Uint8Array(s.length); for(let i=0;i<s.length;i++) u[i]=s.charCodeAt(i); return u; }
   return Uint8Array.from(Buffer.from(b,'base64')); }
+function inPoly(p, x, y){ let c = false; const n = p.length/2;
+  for(let i=0,j=n-1;i<n;j=i++){ const xi=p[2*i], yi=p[2*i+1], xj=p[2*j], yj=p[2*j+1];
+    if(((yi>y)!==(yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi)+xi)) c = !c; } return c; }
+/* Vinkler i en polylinje/et areal i grader. Areal: indvendig vinkel ved hvert hjørne. Polylinje: vinklen mellem de to stykker (0–180) ved de indre punkter. */
+function polyAngles(p, closed){
+  const n = p.length/2, out = new Array(n).fill(null), raw = new Array(n).fill(null);
+  for(let i=0;i<n;i++){
+    if(!closed && (i===0 || i===n-1)) continue;
+    const a = (i-1+n)%n, b = (i+1)%n, t = Math.atan2(p[2*a+1]-p[2*i+1], p[2*a]-p[2*i]) - Math.atan2(p[2*b+1]-p[2*i+1], p[2*b]-p[2*i]);
+    raw[i] = t;
+  }
+  let flip = false;
+  if(closed){ const tw = raw.map(t => ((t % (2*Math.PI)) + 2*Math.PI) % (2*Math.PI)), S = tw.reduce((x,y) => x+y, 0);
+    flip = Math.abs(S-(n+2)*Math.PI) < Math.abs(S-(n-2)*Math.PI);
+    tw.forEach((t,i) => out[i] = (flip ? 2*Math.PI-t : t)*180/Math.PI); }
+  else raw.forEach((t,i) => { if(t==null) return; while(t > Math.PI) t -= 2*Math.PI; while(t <= -Math.PI) t += 2*Math.PI; out[i] = Math.abs(t)*180/Math.PI; raw[i] = t; });
+  return {deg:out, raw, flip};
+}
+/* Sæt længden på side i (punkt i til i+1). Punkterne efter flytter med. */
+function setPolySide(p, i, L){
+  const n = p.length/2, j = i+1; if(j >= n) return;
+  let dx = p[2*j]-p[2*i], dy = p[2*j+1]-p[2*i+1], d = Math.hypot(dx,dy); if(d < 1e-9){ dx = 1; dy = 0; d = 1; }
+  const mx = dx/d*(L-d), my = dy/d*(L-d); for(let k=j;k<n;k++){ p[2*k] += mx; p[2*k+1] += my; }
+}
+/* Sæt vinklen ved hjørne i (grader). Punkterne efter drejer med rundt om hjørnet. */
+function setPolyAngle(p, i, deg, closed){
+  const n = p.length/2, A = polyAngles(p, closed), cur = A.deg[i]; if(cur == null || i < 1 || i > n-2) return;
+  const phi = deg*Math.PI/180, al = cur*Math.PI/180;
+  let delta;
+  if(closed) delta = A.flip ? (phi-al) : (al-phi);
+  else { const t = A.raw[i], target = (t < 0 ? -1 : 1)*phi; delta = t - target; }
+  const cx = p[2*i], cy = p[2*i+1], c = Math.cos(delta), s = Math.sin(delta);
+  for(let k=i+1;k<n;k++){ const dx = p[2*k]-cx, dy = p[2*k+1]-cy; p[2*k] = cx+dx*c-dy*s; p[2*k+1] = cy+dx*s+dy*c; }
+}
 function polyLen(p, closed){ let L=0; for(let i=2;i<p.length;i+=2) L+=Math.hypot(p[i]-p[i-2],p[i+1]-p[i-1]);
   if(closed && p.length>=6) L+=Math.hypot(p[0]-p[p.length-2],p[1]-p[p.length-1]); return L; }
 function polyArea(p){ let s=0; const n=p.length/2; for(let i=0;i<n;i++){ const j=(i+1)%n; s+=p[2*i]*p[2*j+1]-p[2*j]*p[2*i+1]; } return Math.abs(s)/2; }
@@ -545,6 +591,6 @@ async function rasterizePdf(pdfjsLib, PDFLib, bytes, o){
   return out.save();
 }
 
-return {readAnnots, areaNet, volumeM3, angleGeom, fmtNum, cloudPoly, polyLen, polyArea, fmtArea, stampBox, markerOps, rasterizePdf, dimLabels, setMeasure, fmtLen, prims, primsToSvg, textBox, bbox, buildPdf, PT_MM, FILLS, rectOps, circleOps, opsToD};
+return {readAnnots, polyAngles, setPolySide, setPolyAngle, inPoly, areaNet, volumeM3, angleGeom, fmtNum, cloudPoly, polyLen, polyArea, fmtArea, stampBox, markerOps, rasterizePdf, dimLabels, setMeasure, fmtLen, prims, primsToSvg, textBox, bbox, buildPdf, PT_MM, FILLS, rectOps, circleOps, opsToD};
 })();
 if(typeof module !== 'undefined') module.exports = BladrCore;
