@@ -2,6 +2,7 @@
 <html lang="da">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; connect-src 'self'; frame-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="description" content="Bladr er en PDF-læser med markering, mål, lag, optælling og underskrift. Filerne bliver på din egen computer.">
 <meta name="theme-color" content="#1f5f8b">
@@ -10,6 +11,14 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <style>
+@font-face{font-family:'IBM Plex Sans';font-style:normal;font-weight:400;font-display:swap;src:url(vendor/fonts/ibm-plex-sans-latin-400-normal.woff2) format('woff2')}
+@font-face{font-family:'IBM Plex Sans';font-style:normal;font-weight:500;font-display:swap;src:url(vendor/fonts/ibm-plex-sans-latin-500-normal.woff2) format('woff2')}
+@font-face{font-family:'IBM Plex Sans';font-style:normal;font-weight:600;font-display:swap;src:url(vendor/fonts/ibm-plex-sans-latin-600-normal.woff2) format('woff2')}
+@font-face{font-family:'IBM Plex Mono';font-style:normal;font-weight:400;font-display:swap;src:url(vendor/fonts/ibm-plex-mono-latin-400-normal.woff2) format('woff2')}
+@font-face{font-family:'IBM Plex Mono';font-style:normal;font-weight:500;font-display:swap;src:url(vendor/fonts/ibm-plex-mono-latin-500-normal.woff2) format('woff2')}
+@font-face{font-family:'Caveat';font-style:normal;font-weight:500;font-display:swap;src:url(vendor/fonts/caveat-latin-500-normal.woff2) format('woff2')}
+@font-face{font-family:'Dancing Script';font-style:normal;font-weight:500;font-display:swap;src:url(vendor/fonts/dancing-script-latin-500-normal.woff2) format('woff2')}
+@font-face{font-family:'Great Vibes';font-style:normal;font-weight:400;font-display:swap;src:url(vendor/fonts/great-vibes-latin-400-normal.woff2) format('woff2')}
 :root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;font:14px system-ui,-apple-system,"Segoe UI",sans-serif}
 img{max-width:100%}
@@ -23,8 +32,6 @@ img{max-width:100%}
 <body>
 <title>Bladr PDF-læser</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Caveat:wght@500&family=Dancing+Script:wght@500&family=Great+Vibes&display=swap">
 <style>
 /* Layout: to værktøjslinjer øverst (dokument + markering), sidepanel (filer / sider / lag / søg) til venstre, papirbane i midten */
 :root{
@@ -665,15 +672,17 @@ table.calc .ct{width:44px}
       <button type="button" class="linkbtn" id="setCopy">Kopiér fra denne PDF</button>
     </fieldset>
     <fieldset id="helpIcons" hidden><legend>Hjælp: Blanke PDF-ikoner i Stifinder</legend>
-      <p>Når Bladr er standardprogram til PDF, viser Windows nogle gange filerne som blanke sider. Det er en fejl i Chrome, som Bladr ikke selv kan rette, men det tager et minut:</p>
+      <p>Når Bladr er standardprogram til PDF, viser Windows nogle gange filerne som blanke sider. Det er en fejl i Chrome, som Bladr ikke selv kan rette, men det tager et par minutter:</p>
       <ol class="helpsteps">
+        <li>Hent scriptet: <a href="https://marti680.github.io/Bladr/windows-filikon.ps1" download="windows-filikon.ps1">windows-filikon.ps1</a>. Det lander i mappen <b>Overførsler</b>.</li>
+        <li>Se indholdet først, hvis du vil: højreklik på filen, vælg <b>Åbn med</b> og <b>Notesblok</b>. Scriptet ændrer kun ikon-indstillinger for din egen bruger.</li>
         <li>Tryk på <b>Windows-tasten</b>, skriv <b>PowerShell</b>, og åbn <b>Windows PowerShell</b>.</li>
-        <li>Kopiér linjen herunder, indsæt den i PowerShell (højreklik), og tryk <b>Enter</b>.</li>
+        <li>Kopiér linjen herunder, indsæt den i PowerShell (højreklik), og tryk <b>Enter</b>. Den kører netop den fil, du har hentet.</li>
       </ol>
-      <div class="helpcode"><code id="helpCmd">irm https://marti680.github.io/Bladr/windows-filikon.txt | iex</code><button type="button" class="ghost" id="helpCopy">Kopiér</button></div>
-      <p>Står ikonerne stadig blanke bagefter, så genstart computeren. Kør linjen igen, hvis ikonerne bliver blanke efter en opdatering af Chrome. Linjen ændrer kun dine egne indstillinger og kan køres flere gange. <a href="https://marti680.github.io/Bladr/windows-filikon.txt" target="_blank" rel="noopener">Se hvad den gør</a>.</p>
+      <div class="helpcode"><code id="helpCmd">powershell -NoProfile -ExecutionPolicy Bypass -File "$HOME\Downloads\windows-filikon.ps1"</code><button type="button" class="ghost" id="helpCopy">Kopiér</button></div>
+      <p>Står ikonerne stadig blanke bagefter, så genstart computeren. Kør scriptet igen, hvis ikonerne bliver blanke efter en opdatering af Chrome. Det kan køres flere gange.</p>
     </fieldset>
-    <p class="pnote">Bladr version 2026.11.12-1511</p>
+    <p class="pnote">Bladr version 2026.11.14-1716</p>
     <div class="row end"><button type="button" class="ghost" id="setCancel">Annullér</button><button class="primary" type="submit">Gem</button></div>
   </form>
 </div>
@@ -1367,7 +1376,7 @@ async function openBuffer(buf,name,key,seed){
   if(doc){try{doc.destroy()}catch{}}
   doc=null;pages=[];sizes=[];pageTexts=null;textCache={};vecCache={};countPick=false;extractSel=null;extractGrid=null;viewer.innerHTML='';$('thumbs').innerHTML='';encrypted=false;selId=null;
   origBytes=buf.slice(0);
-  loadingTask=pdfjsLib.getDocument({data:new Uint8Array(buf)});
+  loadingTask=pdfjsLib.getDocument({data:new Uint8Array(buf),isEvalSupported:false});
   loadingTask.onPassword=(cb,reason)=>{encrypted=true;askPassword(cb,reason===2)};
   try{ doc=await loadingTask.promise }catch(e){ if(my===gen){$('pwBox').hidden=true;toast('Filen kunne ikke åbnes. Den er måske beskadiget.')} return }
   if(my!==gen)return;
@@ -2721,10 +2730,17 @@ function updExtract(){
 $('xCol').onchange=updExtract;
 $('xClear').onclick=()=>{const p=extractSel&&extractSel.p;extractSel=null;extractGrid=null;if(p)renderAnn(p);updExtract()};
 $('xCopy').onclick=async()=>{
-  if(!extractGrid)return; const tsv=extractGrid.map(r=>r.join('\t')).join('\r\n');
+  if(!extractGrid)return; const tsv=extractGrid.map(r=>r.map(safeCell).join('\t')).join('\r\n');
   try{await navigator.clipboard.writeText(tsv);toast('Kopieret. Indsæt i Excel med Ctrl+V.')}
   catch{const ta=document.createElement('textarea');ta.value=tsv;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast('Kopieret. Indsæt i Excel med Ctrl+V.')}catch{toast('Kunne ikke kopiere. Brug "Gem som Excel-fil".')}ta.remove()}
 };
+/* Celler til udklipsholder/CSV: tekst der starter med = + - @ eller tabulator får ' foran, så Excel ikke læser den som formel. Rene tal røres ikke. */
+function safeCell(v){
+  if(typeof v==='number')return String(v);
+  let s=String(v??'').replace(/[\t\r\n]+/g,' ').trim();
+  if(pureNum(s)!=null)return s;
+  return /^[=+\-@\t]/.test(String(v??''))||/^[=+\-@]/.test(s)?"'"+s:s;
+}
 function xlsxBlob(sheets){
   const wb=XLSX.utils.book_new();
   sheets.forEach(([name,aoa,widths])=>{const ws=XLSX.utils.aoa_to_sheet(aoa);if(widths)ws['!cols']=widths.map(w=>({wch:w}));XLSX.utils.book_append_sheet(wb,ws,name.slice(0,31))});
@@ -2810,7 +2826,7 @@ $('cmpRun').onclick=async()=>{
   $('cmpRun').disabled=true; $('cmpInfo').textContent='Sammenligner …';
   let other=null;
   try{
-    other=await pdfjsLib.getDocument({data:new Uint8Array(bytes)}).promise;
+    other=await pdfjsLib.getDocument({data:new Uint8Array(bytes),isEvalSupported:false}).promise;
     const nA=Math.min(Math.max(1,+$('cmpPageA').value||1),doc.numPages), nB=Math.min(Math.max(1,+$('cmpPageB').value||1),other.numPages);
     const pa=await doc.getPage(nA), pb=await other.getPage(nB), va=pa.getViewport({scale:1}), vb=pb.getViewport({scale:1});
     const sc=Math.min(2400/Math.max(va.width,va.height),3), W=Math.ceil(Math.max(va.width,vb.width)*sc), H=Math.ceil(Math.max(va.height,vb.height)*sc);

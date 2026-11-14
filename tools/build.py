@@ -7,7 +7,7 @@
 Brug:  python3 tools/build.py            (begge udgaver)
        python3 tools/build.py --version 2026.11.01-1
 """
-import argparse, base64, datetime, json, os, re, shutil
+import argparse, base64, datetime, hashlib, json, os, re, shutil
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, 'src')
@@ -18,10 +18,30 @@ CDN_PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/'
 CDN_PDFLIB = 'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/'
 CDN_XLSX = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/'
 
+# Sikkerhed i den installerede udgave: siden må kun hente fra sin egen adresse (ingen eksterne kald).
+# 'unsafe-inline' er nødvendigt, fordi hele appen ligger som inline-script og -stil i index.html.
+# blob: til workers (PDF.js) og rammer (udskrift), data:/blob: til billeder (underskrift, symboler, miniaturer).
+CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; "
+       "font-src 'self'; img-src 'self' data: blob:; connect-src 'self'; frame-src blob:; object-src 'none'; "
+       "base-uri 'none'; form-action 'none'")
+
+# Skrifttyper ligger lokalt i docs/vendor/fonts (kun latin-tegnsæt, som dækker æ, ø og å). Licens: SIL OFL, se OFL-*.txt.
+FONTS = [('IBM Plex Sans', 400, 'ibm-plex-sans-latin-400-normal'), ('IBM Plex Sans', 500, 'ibm-plex-sans-latin-500-normal'),
+         ('IBM Plex Sans', 600, 'ibm-plex-sans-latin-600-normal'), ('IBM Plex Mono', 400, 'ibm-plex-mono-latin-400-normal'),
+         ('IBM Plex Mono', 500, 'ibm-plex-mono-latin-500-normal'), ('Caveat', 500, 'caveat-latin-500-normal'),
+         ('Dancing Script', 500, 'dancing-script-latin-500-normal'), ('Great Vibes', 400, 'great-vibes-latin-400-normal')]
+FONT_CSS = ''.join(f"@font-face{{font-family:'{fam}';font-style:normal;font-weight:{w};font-display:swap;src:url(vendor/fonts/{f}.woff2) format('woff2')}}\n" for fam, w, f in FONTS)
+GOOGLE_FONTS = re.compile(r'<link rel="(?:preconnect|stylesheet)" href="https://fonts\.(?:googleapis|gstatic)\.com[^"]*"[^>]*>\n?')
+
+# Integritetstjek (SRI) på cdnjs-scripts i artifact-udgaven. Hashene beregnes ud fra de lokale kopier i docs/vendor,
+# som er de samme filer som på cdnjs (begge kommer fra npm-pakkerne). Ændres en version, skal den lokale kopi skiftes med.
+CDN_FILES = [(CDN_PDFJS, 'pdf.min.js'), (CDN_PDFJS, 'pdf.worker.min.js'), (CDN_PDFLIB, 'pdf-lib.min.js'), (CDN_XLSX, 'xlsx.full.min.js')]
+
 PWA_HEAD = '''<!doctype html>
 <html lang="da">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="__CSP__">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="description" content="Bladr er en PDF-læser med markering, mål, lag, optælling og underskrift. Filerne bliver på din egen computer.">
 <meta name="theme-color" content="#1f5f8b">
@@ -30,7 +50,7 @@ PWA_HEAD = '''<!doctype html>
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <style>
-:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+__FONTS__:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;font:14px system-ui,-apple-system,"Segoe UI",sans-serif}
 img{max-width:100%}
 [hidden]{display:none!important}
@@ -94,24 +114,42 @@ def assemble(version):
     return app
 
 
+def sri(path):
+    return 'sha384-' + base64.b64encode(hashlib.sha384(read(path, 'rb')).digest()).decode()
+
+
 def build_artifact(app):
+    for base, f in CDN_FILES:
+        tag = f'<script src="{base}{f}"></script>'
+        if app.count(tag) != 1:
+            raise SystemExit(f'Fandt ikke script-tagget til {f} i src/app.html')
+        app = app.replace(tag, f'<script src="{base}{f}" integrity="{sri(os.path.join(DOCS, "vendor", f))}" crossorigin="anonymous"></script>')
+    # Bemærk: PDF.js-arbejderen startes også via GlobalWorkerOptions.workerSrc (new Worker(url)). Den vej kan ikke få
+    # integrity-tjek; det dækker kun script-tagget ovenfor. Arbejderen hentes fra samme faste cdnjs-adresse med version.
     write(os.path.join(DIST, 'artifact.html'), app)
 
 
 def build_pwa(app, version):
-    body = app.replace(CDN_PDFJS, 'vendor/').replace(CDN_PDFLIB, 'vendor/').replace(CDN_XLSX, 'vendor/')
+    body, nf = GOOGLE_FONTS.subn('', app)
+    if nf != 2 or 'fonts.googleapis.com' in body or 'fonts.gstatic.com' in body:
+        raise SystemExit('Kunne ikke fjerne Google Fonts fra den installerede udgave')
+    body = body.replace(CDN_PDFJS, 'vendor/').replace(CDN_PDFLIB, 'vendor/').replace(CDN_XLSX, 'vendor/')
     # Arbejderen kører som rigtig web worker i appen, så den skal ikke også indlæses på siden.
     body, n = re.subn(r'<script src="vendor/pdf\.worker\.min\.js"></script>\n?', '', body)
     if n != 1 or 'cdnjs.cloudflare.com' in body:
         raise SystemExit('Kunne ikke skifte bibliotekerne til lokale filer')
-    write(os.path.join(DOCS, 'index.html'), PWA_HEAD + body + PWA_TAIL)
+    head = PWA_HEAD.replace('__CSP__', CSP).replace('__FONTS__', FONT_CSS)
+    write(os.path.join(DOCS, 'index.html'), head + body + PWA_TAIL)
     shutil.copy(os.path.join(SRC, 'pwa.js'), os.path.join(DOCS, 'pwa.js'))
     write(os.path.join(DOCS, 'sw.js'), read(os.path.join(SRC, 'sw.js')).replace('__VERSION__', version))
     write(os.path.join(DOCS, 'manifest.webmanifest'), json.dumps(MANIFEST, ensure_ascii=False, indent=2) + '\n')
     write(os.path.join(DOCS, '.nojekyll'), '')
-    for f in ('pdf.min.js', 'pdf.worker.min.js', 'pdf-lib.min.js', 'xlsx.full.min.js'):
+    for f in ['pdf.min.js', 'pdf.worker.min.js', 'pdf-lib.min.js', 'xlsx.full.min.js'] + [f'fonts/{x[2]}.woff2' for x in FONTS]:
         if not os.path.exists(os.path.join(DOCS, 'vendor', f)):
             raise SystemExit(f'Mangler docs/vendor/{f}')
+    ext = set(re.findall(r'<(?:script|link|img|iframe)[^>]*(?:src|href)="(https?://[^"]+)"', head + body))
+    if ext:
+        raise SystemExit('Den installerede udgave henter stadig fra eksterne adresser: ' + ', '.join(sorted(ext)))
 
 
 def main():

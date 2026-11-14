@@ -1,10 +1,14 @@
 /* Bladr service worker: gør appen tilgængelig offline og giver besked om nye versioner. */
-const VERSION = '2026.11.12-1511';
+const VERSION = '2026.11.14-1716';
 const CACHE = 'bladr-' + VERSION;
 const ASSETS = [
   './', 'index.html', 'pwa.js', 'manifest.webmanifest',
   'vendor/pdf.min.js', 'vendor/pdf.worker.min.js', 'vendor/pdf-lib.min.js', 'vendor/xlsx.full.min.js',
-  'icons/icon-192.png', 'icons/icon-512.png', 'icons/favicon-32.png'
+  'icons/icon-192.png', 'icons/icon-512.png', 'icons/favicon-32.png',
+  'vendor/fonts/ibm-plex-sans-latin-400-normal.woff2', 'vendor/fonts/ibm-plex-sans-latin-500-normal.woff2',
+  'vendor/fonts/ibm-plex-sans-latin-600-normal.woff2', 'vendor/fonts/ibm-plex-mono-latin-400-normal.woff2',
+  'vendor/fonts/ibm-plex-mono-latin-500-normal.woff2', 'vendor/fonts/caveat-latin-500-normal.woff2',
+  'vendor/fonts/dancing-script-latin-500-normal.woff2', 'vendor/fonts/great-vibes-latin-400-normal.woff2'
 ];
 
 self.addEventListener('install', (e) => {
@@ -16,7 +20,7 @@ self.addEventListener('message', (e) => { if (e.data === 'skipWaiting') self.ski
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('bladr-') && k !== CACHE && k !== 'bladr-fonts').map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('bladr-') && k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -33,15 +37,5 @@ self.addEventListener('fetch', (e) => {
     );
     return;
   }
-  if (/^fonts\.(googleapis|gstatic)\.com$/.test(url.hostname)) {
-    e.respondWith(
-      caches.open('bladr-fonts').then(async (c) => {
-        const hit = await c.match(req);
-        if (hit) return hit;
-        const res = await fetch(req);
-        c.put(req, res.clone());
-        return res;
-      }).catch(() => caches.match(req))
-    );
-  }
+  /* Alt andet (andre adresser) håndteres ikke: den installerede udgave henter intet udefra. */
 });

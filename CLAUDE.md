@@ -31,6 +31,16 @@ Saml gerne flere ændringer i én udgivelse.
 - Brugerens egen artifact-udgave og den installerede app har hver deres lager.
 - Hold siden fri for vandret rulning på mobil, og hold farver i tokens på `:root` med mørk tilstand.
 
+## Sikkerhed
+
+Hold ændringer inden for disse principper:
+
+- **PDF.js kører aldrig kode fra PDF'en:** alle `pdfjsLib.getDocument`-kald har `isEvalSupported: false` (værn mod CVE-2024-4367 i PDF.js 3.x). Nye kald skal have det samme.
+- **CSP i den installerede udgave:** `tools/build.py` sætter en Content-Security-Policy i `PWA_HEAD`, som kun tillader egen adresse (`'self'`), `blob:` til workers og udskriftsrammen og `data:`/`blob:` til billeder. Kræver en ny funktion mere, så udvid politikken så snævert som muligt, og test med konsollen åben for CSP-fejl.
+- **Ingen eksterne kald i den installerede udgave:** biblioteker og skrifttyper ligger i `docs/vendor/` (skrifter i `docs/vendor/fonts/`, OFL-licens), og service workeren cacher kun egne filer. `build.py` stopper, hvis `docs/index.html` henter fra en ekstern adresse.
+- **SRI på CDN i artifact-udgaven:** `build.py` sætter `integrity` (sha384, beregnet ud fra de lokale kopier i `docs/vendor/`) og `crossorigin` på cdnjs-scripts. Skiftes en biblioteksversion, skal den lokale kopi skiftes med, så hashen passer. PDF.js-arbejderen via `workerSrc` kan ikke få integrity.
+- **Tekst til Excel:** celler, der kopieres som tekst til Excel, går gennem `safeCell` (`'` foran tekst, der starter med `=`, `+`, `-`, `@` eller tabulator). Excel-filer (xlsx) skriver tekst som tekst og er sikre.
+
 ## Overbliksdokument
 
 Martin har et Word-dokument `Bladr - overblik.docx` i `C:\Users\mnk96\OneDrive\Claude\Bladr` med: funktioner i Bladr i dag, planlagte funktioner, venteliste (idéer han har valgt at vente med) og mulige huller. Kilden er `tools/overblik/overblik.json`; dokumentet bygges med `node tools/overblik/make.js "<sti>.docx"`.

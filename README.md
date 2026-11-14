@@ -19,13 +19,17 @@ Du kan også gå til *Indstillinger → Apps → Standardapps*, søge efter `.pd
 
 ### Blanke PDF-ikoner i Stifinder
 
-Chrome glemmer at give PDF-filtypen et ikon, når Bladr er standardprogram, så filerne vises som blanke sider. Ret det ved at åbne **Windows PowerShell** og køre:
+Chrome glemmer at give PDF-filtypen et ikon, når Bladr er standardprogram, så filerne vises som blanke sider. Ret det sådan:
+
+1. Hent scriptet [windows-filikon.ps1](https://marti680.github.io/Bladr/windows-filikon.ps1). Det lander i mappen *Overførsler* (Downloads).
+2. Se indholdet, før du kører det: højreklik på filen → **Åbn med** → **Notesblok**. Du kan også læse det her: [docs/windows-filikon.ps1](docs/windows-filikon.ps1).
+3. Åbn **Windows PowerShell**, og kør den fil, du har hentet:
 
 ```powershell
-irm https://marti680.github.io/Bladr/windows-filikon.txt | iex
+powershell -NoProfile -ExecutionPolicy Bypass -File "$HOME\Downloads\windows-filikon.ps1"
 ```
 
-Scriptet ([se indholdet](docs/windows-filikon.txt)) henter Bladrs filikon og sætter det på Bladrs PDF-registrering for din egen bruger. Kør det igen, hvis ikonerne bliver blanke efter en Chrome-opdatering.
+Scriptet henter Bladrs filikon og sætter det på Bladrs PDF-registrering for din egen bruger. `-ExecutionPolicy Bypass` gælder kun for denne ene kørsel. Kør det igen, hvis ikonerne bliver blanke efter en Chrome-opdatering.
 
 ## Opdateringer
 
@@ -50,5 +54,7 @@ Når der kommer en ny version, viser Bladr en besked øverst: *"Der er en ny ver
 ## Udvikling
 
 Se [CLAUDE.md](CLAUDE.md). Kort fortalt: kilden ligger i `src/`, og `python3 tools/build.py` bygger den installérbare udgave til `docs/` (som GitHub Pages viser) og Claude-artifact-udgaven til `dist/`.
+
+Skrifttyperne (IBM Plex Sans og Mono, Caveat, Dancing Script, Great Vibes) ligger lokalt i `docs/vendor/fonts/` under SIL Open Font License.
 
 Bladr bruger [PDF.js](https://mozilla.github.io/pdf.js/) (Apache 2.0), [pdf-lib](https://pdf-lib.js.org/) (MIT) og [SheetJS](https://sheetjs.com/) (Apache 2.0). Licenserne ligger i `docs/vendor/`.

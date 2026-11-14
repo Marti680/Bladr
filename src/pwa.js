@@ -6,7 +6,8 @@
   /* Gem en fil: "Gem som"-dialog hvor browseren har den, ellers en almindelig download. */
   const TYPES = {
     pdf: { description: 'PDF-dokument', accept: { 'application/pdf': ['.pdf'] } },
-    csv: { description: 'CSV til Excel', accept: { 'text/csv': ['.csv'] } }
+    csv: { description: 'CSV til Excel', accept: { 'text/csv': ['.csv'] } },
+    xlsx: { description: 'Excel-projektmappe', accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] } }
   };
   window.bladrDownloads = {
     async save({ filename, data }) {
